@@ -1,0 +1,86 @@
+//////////////////////////////////////////////////////////////////
+//
+// gnugkbuidopts.h autoconfig results (currently only used on Windows)
+//
+// Copyright (c) 2008-2012, Jan Willamowius
+//
+// This work is published under the GNU Public License version 2 (GPLv2)
+// see file COPYING for details.
+// We also explicitly grant the right to link this code
+// with the OpenH323/H323Plus and OpenSSL library.
+//
+//////////////////////////////////////////////////////////////////
+
+#ifndef GNUGKBUILDOPTS_H
+#define GNUGKBUILDOPTS_H 1
+
+// H.460.17
+#undef HAS_H46017
+
+// H.460.18/.19
+#undef HAS_H46018
+
+// H.460.23/.24
+#undef HAS_H46023
+
+// Radius
+
+#undef HAS_RADIUS
+
+// libSSH
+
+#undef HAS_LIBSSH
+#if defined(_MSC_VER) && HAS_LIBSSH
+  #pragma include_alias("libssh/libssh.h", "@LIBSSH_DIR@/include/libssh/libssh.h")
+  #pragma include_alias("libssh/server.h", "@LIBSSH_DIR@/include/libssh/server.h")
+  #pragma include_alias("libssh/legacy.h", "@LIBSSH_DIR@/include/libssh/legacy.h") // inside libssh.h
+  #define LIBSSH_LIB	"@LIBSSH_DIR@/lib/ssh.lib"
+#endif
+
+// Net-SNMP
+
+#undef HAS_NETSNMP
+
+// MYSQL
+
+#undef HAS_MYSQL
+#if defined(_MSC_VER) && HAS_MYSQL
+  #pragma include_alias(<mysql.h>, <@MYSQL_DIR@/include/mysql.h>)
+#endif
+
+
+// PostgreSQL
+
+#undef HAS_PGSQL
+#if defined(_MSC_VER) && HAS_PGSQL
+  #pragma include_alias(<libpq-fe.h>, <@PGSQL_DIR@/include/libpq-fe.h>)
+#endif
+
+
+// Firebird
+
+#undef HAS_FIREBIRD
+#if defined(_MSC_VER) && HAS_FIREBIRD
+  #pragma include_alias(<ibase.h>, <@FIREBIRD_DIR@/include/ibase.h>)
+#endif
+
+
+// SQLite
+
+#undef HAS_SQLITE
+#if defined(_MSC_VER) && HAS_SQLITE
+  #pragma include_alias(<sqlite3.h>, <@SQLITE_DIR@/sqlite3.h>)
+#endif
+
+
+// ODBC
+
+#undef HAS_ODBC
+#if defined(_MSC_VER) && HAS_ODBC
+  #pragma include_alias(<sql.h>,      <@ODBC_DIR@/include/sql.h>)
+  #pragma include_alias(<sqlext.h>,   <@ODBC_DIR@/include/sqlext.h>)
+  #pragma include_alias(<sqltypes.h>, <@ODBC_DIR@/include/sqltypes.h>)
+#endif
+
+
+#endif

@@ -1,0 +1,669 @@
+<sect1>Configuration File
+<label id="config">
+<p>
+The <htmlurl url="http://www.gnugk.org/" name="GNU Gatekeeper">
+configuration file is a standard text file. The basic format is:
+
+<tscreen><verb>
+[Section String]
+Key Name=Value String
+</verb></tscreen>
+
+Comments are marked with a hash (<tt/#/) or a semicolon (<tt/;/)
+at the beginning of a line.
+
+The file
+<tt/complete.ini/
+contains all available sections for GnuGk.
+In most cases it doesn't make sense to use them all at once.
+The file is just meant as a collection of examples for many settings.
+
+The configuration file can be changed at run time.
+Once you modify the configuration file, you may issue the <tt/reload/ command
+via the status port, or send the <tt/HUP/ signal to the gatekeeper process:
+<tscreen><verb>
+kill -HUP `cat /var/run/gnugk.pid`
+</verb></tscreen>
+
+
+<sect1>Database Configuration
+<label id="database">
+<p>
+All GnuGk modules that use a database (eg. <ref id="sqlauth" name="[SQLAuth]">,
+<ref id="sqlacct" name="[SQLAcct]"> etc.) support
+a common set of configuration parameters that is described here.
+You have to repeat all settings for each module, even if they are the same.
+But you are also free to use differend database drivers and options for each module.
+
+<itemize>
+<item><tt/Driver=MySQL | PostgreSQL | Firebird | ODBC | SQLite/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Database driver to use. Currently, <tt/MySQL/, <tt/PostgreSQL/, <tt/Firebird/,
+<tt/ODBC/ and <tt/SQLite/ drivers are implemented.
+Not all of these driver are always available. When GnuGk is compiled, only those
+drivers are included where the necessary database libraries and header files are
+available. When you start GnuGk, you can see in the version string which drivers
+are included in your executable.
+At runtime, GnuGk will load the shared library (DLL) for the database you have configured.
+
+GnuGk supports version 3 of SQLite.
+
+Make sure your database is configured to support password-based
+authentication - Microsoft SQL Server must use "Mixed Mode" for this feature
+to function properly.
+
+<item><tt>Library=c:/Program Files/Mysql/libmysql.dll</tt><newline>
+Default: <tt>N/A</tt><newline>
+<p>
+If the shared library or DLL is not found automatically, you can set a different
+filename here or provide an absolute path to the library.
+
+<item><tt/Host=DNS[:PORT] | IP[:PORT]/<newline>
+Default: <tt/localhost/<newline>
+<p>
+SQL server host address. Can be in the form of <tt/DNS[:PORT]/ or <tt/IP[:PORT]/.
+Like <tt/sql.mycompany.com/ or <tt/sql.mycompany.com:3306/ or <tt/192.168.3.100/.
+The ODBC driver will ignore this setting.
+
+<item><tt/Database=billing/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+The database name to connect to.
+<p>
+To connect to an <bf/ODBC data source from a Windows server/, create the data source though Control Panel / Administrative Tools / Data Sources (ODBC) and add a System DSN. Use the name of the System DSN in GnuGk's Database= setting.
+<p>
+To connect to an <bf/ODBC data source from a Unix server/, use a DSN definition for unixODBC of the form <tt/DSN=GnuGk;UID=admin;PWD=secret;/ in GnuGk's Database= setting. GnuGk's Usename= and Password= settings will be ignored in this case, but should be present.
+
+<item><tt/Username=gnugk/<newline>
+<p>
+The username used to connect to the database.
+
+<item><tt/Password=secret/<newline>
+<p>
+The password used to connect to the database.
+If the password is not specified, a database connection attempt 
+without any password will be made.
+If <tt/EncryptAllPasswords/ is enabled, or a <tt/KeyFilled/ variable is defined
+in this section, the password to connect to the database is in an encrypted form and should be created using
+the <tt/addpasswd/ utility.
+
+<item><tt/MinPoolSize=5/<newline>
+Default: <tt/1/<newline>
+<p>
+Define the number of active SQL connections. This allows for better performance
+under heavy load, because more than 1 concurrent query can be executed 
+at the same time. Setting <tt/MinPoolSize=1/ will simulate the old behavior, 
+when access to the SQL database was serialized (one query at time).
+Don't let the name fool you, this is the exact number of connections.
+</itemize>
+
+<sect2>Placeholders in queries
+<p>
+Many SQL modules provide a set of placeholders that you can use
+in your queries, like %{CallId} in SqlAcct.
+
+Placeholders allways start with the percent sign. Beware that you must
+escape the percent sign if you need it for something else in your
+queries (eg. in a LIKE). One way to do so is to use CHAR(37), eg.
+concat(alias,CHAR(37)) instead of concat(alias,'%').
+
+<sect2>Stored Procedures
+<p>
+Stored procedures work very well when using MySQL.
+
+When using ODBC, you can not call stored procedures which use parameters using the "CALL ProcedureName" syntax, but you can call them with "EXEC ProcedureName".
+
+
+<sect1>Regular Expressions
+<label id="regex">
+<p>
+In a few places in the configuration file, GnuGk allows regular expressions.
+The syntax for these regular expressions is "extended POSIX 1003.2 regular expressions".
+On Unix systems you can usually get a manual page explaining the syntax with "man 7 regex"
+or see it online at <url url="http://www.kernel.org/doc/man-pages/online/pages/man7/regex.7.html" name="http://www.kernel.org/doc/man-pages/online/pages/man7/regex.7.html">.
+
+
+<sect1>Section &lsqb;Gatekeeper::Main&rsqb;
+<label id="gkmain">
+<p>
+<itemize>
+<item><tt/Name=GnuGk/<newline>
+Default: <tt/OpenH323GK/<newline>
+<p>
+Gatekeeper identifier of this gatekeeper. The gatekeeper will only respond to
+GRQs for this ID and will use it in a number of messages to its endpoints.
+
+<item><tt/EnableIPv6=1/<newline>
+Default: <tt/0/<newline>
+<p>
+If GnuGk has been compiled with IPv6 support, you can use this switch to turn it on.
+
+<item><tt/Home=192.168.1.1/<newline>
+Default: <tt/listen to all IPs/<newline>
+<p>
+The gatekeeper will listen for requests on this IP address.
+If not set, the gatekeeper will listen on all IPs of your host.
+Multiple Home addresses can be used
+and must be separated with a semicolon (;) or comma (,).
+
+<item><tt>NetworkInterfaces=192.168.1.1/24,10.0.0.1/0</tt><newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Specify the network interfaces of the gatekeeper. By default the gatekeeper
+will automatically detect the interfaces of your host, so this setting is not 
+usually required, but is available if automatic detection fails. 
+If you are using GnuGk behind a NAT box then you should use the ExternalIP
+setting (described below) which will automatically configure GnuGk to operate as if it was
+on the NAT box.  The ExternalIP setting will take precedence and will override this value.
+
+<bf/NOTE:/ If this setting is changed, you must restart the gatekeeper.  A reload from the status port
+will not cause this value to be re-read.
+
+<item><tt/Bind=192.168.1.1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Specify the IP address for default routing.
+Use this to specify which default IP address to use in a multihomed
+virtual environment where there may be many virtual interfaces on one host.
+
+<item><tt/EndpointIDSuffix=_gk1/<newline>
+Default: <tt/_endp/<newline>
+<p>
+The gatekeeper will assign a unique identifier to each registered endpoint.
+This option can be used to specify a suffix to append to the endpoint identifier. This is only useful when using more than one gatekeeper.
+<bf/This setting doesn't change when the config is reloaded!/
+
+<item><label id="ttl"><tt/TimeToLive=300/<newline>
+Default: <tt/-1/<newline>
+<p>
+An endpoint's registration with a gatekeeper may have a limited life span.
+The gatekeeper specifies the registration duration for an endpoint
+by including a <bf/timeToLive/ field in the RCF message.
+After the specified length of time, the registration is considered expired.
+The endpoint must periodically send a RRQ having the <bf/keepAlive/
+bit set prior to the expiration time. Such a message may include a
+minimum amount of information as described in H.225.0 and is known as a lightweight RRQ.
+
+The endpoint may request a shorter <bf/timeToLive/ in the RRQ message
+to the gatekeeper.
+
+To avoid an overload of RRQ messages,
+the gatekeeper automatically resets this timer
+to 60 seconds if you specify a lower value.
+
+After the expiration time,
+the gatekeeper will make two attempts using IRQ messages to determine
+if the endpoint is still alive. If the endpoint responds with an IRR,
+the registration will be extended. If not, the gatekeeper will send
+a URQ with reason <bf/ttlExpired/ to the endpoint.
+The endpoint must then re-register with the gatekeeper using a full RRQ message.
+
+To disable this feature, set it to <tt/-1/.
+
+<item><label id="ttl"><tt/EnableTTLRestrictions=0/<newline>
+Default: <tt/1/<newline>
+<p>
+The default TimeToLive (TTL) configured via the "TimeToLive" parameter does
+not apply to endpoints which use the H.460.17 and H.460.18 protocols to
+traverse a firewall.  In order to keep the firewall pinhole open the
+TimeToLive for those endpoints defaults to 19 seconds. The
+"TimeToLive" parameter would allow you to change this to as low as 5 seconds,
+and as high as 30 seconds.
+
+If you know for sure that there is no need for a keep-alive, you can disable
+these restrictions by setting this switch to 0. If TTL restrictions
+are disabled, the TimeToLive becomes a global setting for all
+endpoints, including H.460.17 and H.460.18.
+
+<item><tt/CompareAliasType=0/<newline>
+Default: <tt/1/<newline>
+<p>
+By default, a H323ID of '1234' won't match E164 number '1234' when comparing aliases. This parameter allows you 
+to ignore the alias type when performing comparisons.
+
+<item><tt/CompareAliasCase=0/<newline>
+Default: <tt/1/<newline>
+<p>
+By default, alias 'jan' won't match alias 'Jan'.  If set to false, the comparison will not be case sensitive.
+
+<item><tt/TraceLevel=2/<newline>
+Default: <tt/0/<newline>
+<p>
+Set trace level (same as -t on the command line).
+
+<item><tt/TotalBandwidth=100000/<newline>
+Default: <tt/-1/<newline>
+<p>
+Total bandwidth available for all endpoints in units of 100 bits per second (eg. 5120 means 512 kbps).
+By default this feature is off (-1).
+
+<bf>NOTE:</bf> At this time, the GnuGk only checks calls to and from registered endpoints.
+
+<item><tt/MinimumBandwidthPerCall=1280/<newline>
+Default: <tt/-1/<newline>
+<p>
+Raise bandwidth requests from endpoints to at least this value in units of 100 bits per second.
+The value includes both directions, so a 384 kbps call would have a value of 7680.
+Setting a minimum is useful when endpoints don't report correct values (eg. Netmeeting).
+If set to zero or less, no minimum is enforced (default).
+
+<bf>NOTE:</bf> At this time, the GnuGk only checks calls to and from registered endpoints.
+
+<item><tt/MaximumBandwidthPerCall=100000/<newline>
+Default: <tt/-1/<newline>
+<p>
+Set maximum bandwidth allowed for a single call in units of 100 bits per second.
+If set to zero or less, no maximum is enforced (default).
+
+<bf>NOTE:</bf> At this time, the GnuGk only checks calls to and from registered endpoints.
+
+<item><tt/RedirectGK=Endpoints > 100 | Calls > 50/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+This option allow you to redirect endpoints to alternate gatekeepers
+if the gatekeeper becomes overloaded.
+In the example above, the gatekeeper will
+reject a RRQ if the number of registered endpoints would exceed 100,
+or reject an ARQ if concurrent calls exceed 50.
+
+Furthermore, you may explicitly redirect all endpoints by
+setting this option to <tt/temporary/ or <tt/permanent/.
+The gatekeeper will send a RAS rejection message with a list of
+alternate gatekeepers defined in <tt/AlternateGKs/.
+Note that a <tt/permanent/ redirection means that the redirected endpoints
+will not register with this gatekeeper again.
+<bf>NOTE:</bf>  The redirect capability will only function with H.323 version 4
+compliant endpoints.
+
+<label id="alternategks">
+<item><tt/AlternateGKs=1.2.3.4;1719;false;120;GnuGk/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+If the endpoint loses connectivity with GnuGk it should automatically try 
+to register with the alternate gatekeeper specified here.
+
+<bf>NOTE:</bf>  Depending on the endpoint, it may not attempt to re-establish a 
+connection to its original gatekeeper.  Support for "Assigned Gatekeepers" was added
+in H.323v6.  See <url url="http://www.packetizer.com/ipmc/h323/whatsnew_v6.html" name="http://www.packetizer.com/ipmc/h323/whatsnew_v6.html"> for additional information.
+
+The primary gatekeeper includes a field in the RCF to inform endpoints which alternate
+IP and gatekeeper identifier to use.
+
+The alternate gatekeeper needs to be aware of all 
+registrations on the primary gatekeeper or else it would reject calls.
+Our gatekeeper can forward every RRQ to an alternate IP address.
+
+The AlternateGKs config option specifies the fields contained in
+the primary gatekeeper's RCF. The first and second fields of this string define
+where (IP, port) to forward to.
+The third tells endpoints whether they need to register with the alternate gatekeeper
+before placing calls. They usually don't because we forward their RRQs, so they
+are automatically known to the alternate gatekeeper.
+The fourth field specifies the priority for this gatekeeper.
+Lower is better; usually the primary gatekeeper is considered to have priority 1.
+The last field specifies the alternate gatekeeper's identifier.
+
+You may specify multiple alternate gatekeepers as a comma separated list.
+
+This global definition can be overriden by a per IP specification in
+<ref id="rassrvalternategatekeeper" name="[RasSrv::AlternateGatekeeper]">.
+
+<bf>NOTE:</bf> In older versions of GnuGk, the fields were separated by colons.
+Since version 2.3.3 this is deprecated and you must change your configurations to use semicolons.
+
+<item><tt/SendTo=1.2.3.4:1719/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Although this information is contained in AlternateGKs, you must still
+specify which address to forward RRQs to. This might differ from AlternateGK's
+address due to multihomed systems, so it's a separate config option.
+
+You can specify multiple gatekeepers in a comma separated list.
+
+<item><tt/SkipForwards=1.2.3.4,5.6.7.8/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+To avoid circular forwarding, you shouldn't forward RRQs you get from the
+other gatekeeper (this statement is true for both primary and alternate gatekeeper).
+Two mechanisms are used to identify whether a request should be forwarded.
+The first one looks for a flag in the RRQ. Since few endpoints implement this,
+we can increase the overall reliability of the system by specifying it here.
+
+Specify the other gatekeeper's IP in this list.
+
+<item><tt/StatusPort=7000/<newline>
+Default: <tt/7000/<newline>
+<p>
+Status port to monitor the gatekeeper.
+See <ref id="monitor" name="this section"> for details.
+
+The GNU Gatekeeper will listen to the status port on all IPs it is listening for call signaling.
+You should protect those ports in your firewall and set access control rules
+in the <ref id="gkstatusauth" name="[GkStatus::Auth]"> section for those you can't close completely.
+
+<item><tt/StatusTraceLevel=2/<newline>
+Default: <tt/2/<newline>
+<p>
+Default output trace level for new status interface clients.
+See <ref id="monitor" name="this section"> for details.
+
+<item><tt/MaxStatusClients=5/<newline>
+Default: <tt/20/<newline>
+<p>
+Specifies the maximum number of concurrent connections on the status port.
+To disable any connections to the status port, set this switch to 0.
+
+<item><tt/SshStatusPort=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Use the SSH protocol for the status port.
+User passwords can be set in the <ref id="gkstatusauth" name="[GkStatus::Auth]"> section.
+
+<item><tt/TimestampFormat=ISO8601/<newline>
+Default: <tt/Cisco/<newline>
+<p>
+This setting configures the default format of timestamp strings generated by the gatekeeper.
+This option affects <ref id="sqlacct" name="[SQLAcct]">, 
+<ref id="radacct" name="[RadAcct]">, <ref id="fileacct" name="[FileAcct]">
+and other modules, but not <ref id="calltable" name="[CallTable]">.
+You can further customize timestamp formatting per module by configuring the
+<tt/TimestampFormat/ setting in the module-specific configuration portion of the config file.
+<p>
+There are four predefined formats:
+<itemize>
+<item><tt/RFC822/ - a default format used by the gatekeeper (example: Wed, 10 Nov 2004 16:02:01 +0100)
+<item><tt/ISO8601/ - standard ISO format (example: 2004-11-10 T 16:02:01 +0100)
+<item><tt/Cisco/ - format used by Cisco equipment (example: 16:02:01.534 CET Wed Nov 10 2004)
+<item><tt/MySQL/ - simple format that MySQL can understand (example: 2004-11-10 16:02:01)
+</itemize>
+<p>
+If none of the predefined options is suitable, you can build your own format string using
+rules from the <tt/strftime/ C function (see man strftime or search MSDN for strftime).
+In general, the format string consists of regular character and format codes, preceded
+by a percent sign. Example: "%Y-%m-%d and percent %%" will result in "2004-11-10 and percent %".
+Some common format codes:
+<itemize>
+<item><tt/%a/ - abbreviated weekday name
+<item><tt/%A/ - full weekday name
+<item><tt/%b/ - abbreviated month name
+<item><tt/%B/ - full month name
+<item><tt/%d/ - day of month as decimal number
+<item><tt/%H/ - hour in 24-hour format
+<item><tt/%I/ - hour in 12-hour format
+<item><tt/%m/ - month as decimal number
+<item><tt/%M/ - minute as decimal number
+<item><tt/%S/ - second as decimal number
+<item><tt/%y/ - year without century
+<item><tt/%Y/ - year with century
+<item><tt/%u/ - microseconds as decimal number (<bf/this is a GnuGk extension/)
+<item><tt/%z/ - time zone abbreviation (+0100)
+<item><tt/%Z/ - time zone name
+<item><tt/%%/ - percent sign
+</itemize>
+
+<item><tt/EncryptAllPasswords=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Enable encryption of all passwords in the config (SQL passwords, RADIUS
+passwords, [Password] passwords, [GkStatus::Auth] passwords). If enabled,
+all passwords must be encrypted using the <tt/addpasswd/ utility. Otherwise
+only [Password] and [GkStatus::Auth] passwords are encrypted (old behavior).
+
+<item><tt/KeyFilled=0/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a global padding byte to be used during password encryption/decryption. 
+It can be overridden by setting <tt/KeyFilled/ within a particular config section.
+Usually, you do not need to change this option.
+
+</itemize>
+
+Most users will never need to change any of the following values.
+They are mainly used for testing or very sophisticated applications.
+
+<itemize>
+<item><tt/UseBroadcastListener=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Defines whether to listen to broadcast RAS requests. This requires
+binding to all interfaces on a machine, so if you want to run multiple
+gatekeepers on the same machine you should turn this off.
+
+<item><tt/UnicastRasPort=1719/<newline>
+Default: <tt/1719/<newline>
+<p>
+The RAS channel TSAP identifier for unicast.
+
+<item><tt/UseMulticastListener=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Enable or disable gatekeeper discovery using multicast. By default it is enabled.
+
+<item><tt/MulticastPort=1718/<newline>
+Default: <tt/1718/<newline>
+<p>
+The RAS channel TSAP identifier for multicast.
+
+<item><tt/MulticastGroup=224.0.1.41/<newline>
+Default: <tt/224.0.1.41/<newline>
+<p>
+The multicast group for the RAS channel.
+
+<item><tt/EndpointSignalPort=1720/<newline>
+Default: <tt/1720/<newline>
+<p>
+Default port for call signaling channel of endpoints.
+Used when searching for endpoints in the registration table
+when the actual call signaling port is unknown.
+
+<item><tt/ListenQueueLength=1024/<newline>
+Default: <tt/1024/<newline>
+<p>
+Queue length for incoming TCP connection.
+
+<item><tt/StatusWriteTimeout=5000/<newline>
+Default: <tt/5000/<newline>
+<p>
+Time in milliseconds for write timeout on status channel.
+
+<item><tt/ExternalIP=myip.no-ip.com/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+When using GnuGk behind a NAT you can set the external IP address 
+that you wish the gatekeeper to masquerade as. This will allow external endpoints
+and other gatekeepers to contact the NATed gatekeeper. To work you must enable proxy-mode and port
+forward the required ports to the gatekeeper IP or put the gatekeeper in the NAT box
+DMZ. This is different than the bind setting, which specifies a physical IP
+address on the GnuGk box.
+
+You may specify an IP address or a fully-qualified domain name (FQDN).  If
+you use a FQDN and <tt>ExternalIsDynamic</tt> is set to false, it will be
+resolved to an IP address on startup or configuration reload.  If
+<tt>ExternalIsDynamic</tt> is set to true, the name will be stored and
+resolved when needed.
+
+<item><tt/ExternalIsDynamic=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Configures the GnuGk to support an external dynamic address.  If enabled,
+GnuGk will ensure that the Dynamic DNS (DDNS) service receives keep-alive
+messages to maintain your DDNS name lease.  You must also configure the
+<tt>ExternalIP</tt> setting with a DNS address maintained by a DDNS service
+such as www.dyndns.com or www.no-ip.com.
+
+<item><tt/DefaultDomain=gnugk.org,gnugk.de/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+If the GnuGk receives a request for an address in the format
+<bf>user@domain.com</bf>, this option will strip the domain from the address
+if it matches the <tt>DefaultDomain</tt> setting and will then process the
+request using just the "<bf>user</bf>" field.  This is useful when receiving
+interdomain calls placed via SRV routing policy where the full URI is
+received.  It can also be used in conjunction with the
+[RasSrv::RewriteAlias] section to convert the received URI into an E.164
+number for further processing and routing. 
+
+<item><tt/Authenticators=H.235.1,CAT/<newline>
+Default: <tt>H.235.1,MD5,CAT</tt><newline>
+<p>
+Selects the specific authenticators to use when authenticating endpoints. 
+The default options are: H.235.1 (HMAC SHA1 / old H235AnnexD), MD5 (Digest Authentication) and CAT (Cisco Access Tokens ie RADIUS). 
+Setting a value of NONE will disable authenticators.
+The order indicates the priority of the authentication mechanism.
+If this setting is omitted, all authenticators are loaded by default. 
+If you are using plugin authenticators, then you may want to disable the default authenticators to provide optimum security.
+Note: H.235.1 requires OpenSSL support compiled into GnuGk.
+<bf/This switch is only available if GnuGk is compiled with H323Plus./
+
+<item><tt/DisconnectCallsOnShutdown=0/<newline>
+Default: <tt>1</tt><newline>
+<p>
+GnuGk will disconnect all ongoing calls when it shuts down and
+will send an unregistration request to all endpoints.
+To override this default, set this parameter to "0".
+This switch is intended mainly for gatekeepers running in direct mode;
+in routed mode and proxy mode calls will still get disrupted when the gatekeeper shuts down.
+
+<item><tt/MaxASNArraySize=400/<newline>
+Default: <tt>128</tt><newline>
+<p>
+EXPERIMENTAL:
+Sets the maximum number of elements in an ASN encoded array, eg. the max. number of aliases in a list.
+Versions of PTLib through v2.10.1 default to 128 elements. Beware of hitting the limits of other vendors if you
+increase this setting.
+</itemize>
+
+
+<sect1>Section &lsqb;GkStatus::Auth&rsqb;
+<label id="gkstatusauth">
+<p>
+Defines a number of rules regarding who is allowed to connect to the status port.
+Access to the status port provides full control over your gatekeeper. Ensure that this is set correctly.
+The status port is active on all IPs GnuGk listens to. You should block as many status ports in your firewall
+as your setup allows. If you rely on password rules to secure the status port, you should add additional
+IP based rules ('explicit' or 'regex') to limit the IP range where logins are allowed from.
+<itemize>
+<item><tt/rule=allow/<newline>
+Default: <tt/forbid/<newline>
+<p>
+Possible values are
+<itemize>
+<item><tt/forbid/ - disallow any connection.
+<item><tt/allow/ - allow any connection
+<item><tt/explicit/ - reads the parameter <tt>ip=value</tt>
+where <tt/ip/ is the IP address of the client,
+<tt/value/ is <tt/1,0/ or <tt/allow,forbid/ or <tt/yes,no/.
+If <tt/ip/ is not listed the parameter <tt/default/ is used.
+<item><tt/regex/ - the IP of the client is matched against the given regular expression.
+<p><descrip>
+<tag/Example:/
+To allow client from 195.71.129.0/24 and 195.71.131.0/24:
+<quote><tt>regex=^195\.71\.(129|131)\.[0-9]+$</tt></quote>
+</descrip>
+<item><tt/password/ - the user must provide an appropriate username and password to login. The format of username/password is the same as <ref id="password" name="[SimplePasswordAuth]"> section.
+
+</itemize>
+
+These rules may be combined with "|" (to specify a logical "OR") or "&amp;" (for logical "AND"). For example,
+<itemize>
+<item><tt>rule=explicit | regex</tt><newline>
+The IP of the client must match <tt/explicit/ <bf/or/ <tt/regex/ rule.
+<p>
+<item><tt>rule=regex & password</tt><newline>
+The IP of the client must match <tt/regex/ rule, <bf/and/ the user has to login by username and password.
+</itemize>
+
+Using the SSH protocol for the status port implies that all users are authenticated by password.
+
+<item><tt/default=allow/<newline>
+Default: <tt/forbid/<newline>
+<p>
+Only used when <tt/rule=explicit/.
+
+<item><tt/DSAKey=/etc/ssh/ssh_host_dsa_key<newline>
+Default: <tt/ssh_host_dsa_key (in current working directory)/<newline>
+<p>
+Path for the file containing the DSA host key. (only used for SSH)
+
+<item><tt/RSAKey=/etc/ssh/ssh_host_rsa_key<newline>
+Default: <tt/ssh_host_rsa_key (in current working directory)/<newline>
+<p>
+Path for the file containing the RSA host key. (only used for SSH)
+
+<item><tt/Shutdown=forbid/<newline>
+Default: <tt/allow/<newline>
+<p>
+To allow the gatekeeper to be shutdown via status port.
+
+<item><tt/DelayReject=5/<newline>
+Default: <tt/0/<newline>
+<p>
+Time (in seconds) to wait before rejecting an invalid username/password.  Useful to insert
+a delay in brute-force attacks.
+</itemize>
+
+<sect1>Section &lsqb;GkStatus::Filtering&rsqb;
+<label id="gkstatusfilteringsect">
+<p>
+See <ref id="statusportfiltering" name="Status Port Filtering">.
+
+<sect1>Section &lsqb;LogFile&rsqb;
+<label id="logfile">
+<p>
+This section defines log file related parameters. Currently, it allows
+users to specify log file rotation options.
+
+<itemize>
+<item><tt>Filename=/var/log/gk_trace.log</tt><newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Set the output filename for the log file (same as -o on the command line).
+On Windows, backslashes in the file name have to be escaped.
+<p>
+<bf/This setting doesn't change when the config is reloaded!/
+
+<item><tt/Rotate=Hourly | Daily | Weekly | Monthly/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+If set, the log file will be rotated based on this setting. Hourly rotation
+enables rotation once per hour, daily - once per day, weekly - once per week
+and monthly - once per month. An exact rotation moment is determined by a combination
+of <tt/RotateDay/ and <tt/RotateTime/ variables. During rotation, an existing 
+file is renamed to CURRENT_FILENAME.YYYYMMDD-HHMMSS, where YYYYMMDD-HHMMSS 
+is replaced with the current timestamp, and new lines are logged to an empty 
+file. To disable rotation, do not configure the <tt/Rotate/ parameter or set it to 0.
+
+<descrip>
+<tag/Example 1 - rotate every hour (00:45, 01:45, ..., 23:45):/
+<tt/&lsqb;LogFile&rsqb;/<newline>
+<tt>Rotate=Hourly</tt><newline>
+<tt>RotateTime=45</tt><newline>
+<tt>Filename=/var/log/gk_trace.log</tt><newline>
+</descrip>
+
+<descrip>
+<tag/Example 2 - rotate every day at 23:00 (11PM):/
+<tt/&lsqb;LogFile&rsqb;/<newline>
+<tt>Rotate=Daily</tt><newline>
+<tt>RotateTime=23:00</tt><newline>
+<tt>Filename=C:\\Logs\\GnuGk.log</tt><newline>
+</descrip>
+
+<descrip>
+<tag/Example 3 - rotate every Sunday at 00:59:/
+<tt/&lsqb;LogFile&rsqb;/<newline>
+<tt>Rotate=Weekly</tt><newline>
+<tt>RotateDay=Sun</tt><newline>
+<tt>RotateTime=00:59</tt><newline>
+</descrip>
+
+<descrip>
+<tag/Example 4 - rotate on the last day of each month:/
+<tt/&lsqb;LogFile&rsqb;/<newline>
+<tt>Rotate=Monthly</tt><newline>
+<tt>RotateDay=31</tt><newline>
+<tt>RotateTime=23:00</tt><newline>
+</descrip>
+</itemize>
+

@@ -1,0 +1,139 @@
+<sect>Advanced Topics
+<p>
+This portion of the manual will cover advanced topics, such as compiling and debugging the GNU Gatekeeper.
+
+<sect1>Compiling GnuGk from CVS
+<label id="compile">
+<p>
+The following instructions are an example of how to compile GnuGk from source on an Ubuntu platform.
+<p>
+First make sure your system is up-to-date and install the tools needed for the compile
+<verb>
+$ sudo apt-get update
+$ sudo apt-get install flex bison build-essential subversion cvs pkg-config automake
+</verb>
+Also make sure the "...-devel" packages for all databases you want to use are installed.
+<p>
+<bf>NOTE</bf>:  As of 2011-09-28, it's recommended that you do not use PTLib SVN; it is undergoing
+many changes that are incompatible with GnuGK.
+
+Get and compile PTLib from SourceForge:
+<verb>
+$ cd ~
+$ svn co http://opalvoip.svn.sourceforge.net/svnroot/opalvoip/ptlib/tags/v2_10_1 ptlib-v2.10.1/
+$ cd ptlib-v2.10.1
+$ export PTLIBDIR=~/ptlib-v2.10.1
+$ ./configure
+$ make optnoshared
+</verb>
+
+Get and compile H323Plus:
+<verb>
+$ cd ~
+$ cvs -d:pserver:anonymous@h323plus.cvs.sourceforge.net:/cvsroot/h323plus login
+
+(just press enter when prompted for password)
+
+$ cvs -z3 -d:pserver:anonymous@h323plus.cvs.sourceforge.net:/cvsroot/h323plus co -P h323plus
+
+$ cd h323plus
+$ export OPENH323DIR=~/h323plus
+$ ./configure
+$ make optnoshared
+</verb>
+
+Get and compile GnuGk:
+<verb>
+$ cd ~
+$ cvs -d:pserver:anonymous@openh323gk.cvs.sourceforge.net:/cvsroot/openh323gk login
+
+(just press enter when prompted for password)
+
+$ cvs -z3 -d:pserver:anonymous@openh323gk.cvs.sourceforge.net:/cvsroot/openh323gk co -P openh323gk
+
+$ cd openh323gk
+$ ./configure --enable-h46018
+$ make optnoshared
+</verb>
+
+Once the compile is finished, the binary can be found in the 
+obj_linux_x86_s subdirectory.
+
+At this time, because all libraries and GnuGk are running CVS and SVN
+versions of the software, in order to stay up-to-date, run the following:
+
+<verb>
+$ cd ~/ptlib
+$ svn update
+$ cd ~/h323plus
+$ cvs update
+$ cd ~/openh323gk
+$ cvs update
+</verb>
+If any of the source files are changed, you have to recompile.
+
+<sect1>Tracing GnuGk
+<label id="tracing">
+<p>
+If GnuGk doesn't handle calls like you expect, you can enable tracing to see what GnuGk does internally.
+Don't confuse this with connection to the status port and looking at the events ("telnet 127.0.0.1 7000").
+Creating a trace file will reveal a lot more of the internal workings.
+
+On the command line, start GnuGk with -ttttt and -o to write the trace to a file:
+<verb>
+gnugk -c gnugk.ini -ttttt -o trace.log
+</verb> 
+
+If you have a lot of calls, trace.log can grow quite large, so make sure you disable it after you
+are done with testing, or at least reduce the trace level to 2 or 3 for production.
+
+You can also enable tracing in your config file:
+<verb>
+[Gatekeeper::Main]
+TraceLevel=5
+
+[LogFile]
+Filename=trace.log
+</verb> 
+
+Or you can enable tracing through the status port:
+<verb>
+setlog trace.log
+debug trc 5
+</verb> 
+
+Doing it through the status port has the advantage that you won't interrupt ongoing calls
+and you can quickly turn it on or off.
+
+The trace file will contain information al everything GnuGk does. To reduce it to a single call,
+you can eg. search for the callID or write a small Perl script to extract only those messages
+you are interested in.
+
+<sect1>Debugging GnuGk (on Linux)
+<label id="debug">
+<p>
+In order to use gdb with GnuGk, the software and libraries must be compiled with debug support.
+
+You may follow the instructions above in obtaining the software, but the compile in each subdirectory must be:
+<verb>
+$ make debugnoshared
+</verb>
+
+Allow unlimited core dumps:
+<verb>
+ulimit -c unlimited
+</verb>
+
+Run GnuGk:
+<verb>
+~/openh323/obj_linux_x86_64_d_s/gnugk -c your.ini
+# wait for crash
+gdb obj_linux_x86_64_d/gnugk core
+bt
+</verb>
+
+Once you've obtained a backtrace, post it to the mailing list.
+
+Note: On some systems, the core dump is named "core.xxx" where xxx
+is the process number of the program that crashed.
+

@@ -1,0 +1,1076 @@
+AC_INIT(gk.h)
+
+AC_PROG_CXX
+
+dnl ########################################################################
+dnl Check if recv call supports MSG_NOSIGNAL flag
+AC_MSG_CHECKING(if MSG_NOSIGNAL is supported by recv() call)
+AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <sys/socket.h>
+],
+[recv(0,NULL,1,MSG_NOSIGNAL);], HAS_MSG_NOSIGNAL=1, HAS_MSG_NOSIGNAL=0)
+if test "$HAS_MSG_NOSIGNAL" = 0 ; then
+  AC_MSG_RESULT(no)
+else
+  AC_MSG_RESULT(yes)
+  STDCCFLAGS="-DHAS_MSG_NOSIGNAL=1 $STDCCFLAGS"
+fi
+
+dnl ########################################################################
+dnl look for ptlib, use a preference order of explicit PTLIBDIR, directory
+dnl at same level, home directory, /usr/local or /usr.
+
+if test "${PTLIBDIR:-unset}" != "unset" ; then
+  if test -d ${PTLIBDIR}; then
+  	AC_CHECK_FILE(${PTLIBDIR}/make/unix.mak, HAS_PTLIB=1)
+  fi
+  if test "${HAS_PTLIB:-unset}" != "unset" ; then
+    AC_PATH_PROG(PTLIB_CONFIG, ptlib-config, , ${PTLIBDIR}/make)
+  fi
+fi
+if test "${HAS_PTLIB:-unset}" = "unset" ; then
+  if test -d ${HOME}/ptlib/include; then
+  	AC_CHECK_FILE(${HOME}/ptlib/include/ptlib.h, HAS_PTLIB=1)
+  fi
+  if test "${HAS_PTLIB:-unset}" != "unset" ; then
+    PTLIBDIR="${HOME}/ptlib"
+    AC_PATH_PROG(PTLIB_CONFIG, ptlib-config, , ${PTLIBDIR}/make)
+  else
+	if test -d ../ptlib; then
+  	  AC_CHECK_FILE(../ptlib/include/ptlib.h, HAS_PTLIB=1)
+  	fi
+  	if test "${HAS_PTLIB:-unset}" != "unset" ; then
+      PTLIBDIR="../ptlib"
+      AC_PATH_PROG(PTLIB_CONFIG, ptlib-config, , ${PTLIBDIR}/make)
+  	else
+      if test -d /usr/local/include; then
+	    AC_CHECK_FILE(/usr/local/include/ptlib.h, HAS_PTLIB=1)
+	  fi
+      if test "${HAS_PTLIB:-unset}" != "unset" ; then
+        AC_PATH_PROG(PTLIB_CONFIG, ptlib-config, , /usr/local/share/ptlib/make:/usr/local/bin)
+      else
+	    if test -d /usr/include; then
+          AC_CHECK_FILE(/usr/include/ptlib.h, HAS_PTLIB=1)
+	    fi
+        if test "${HAS_PTLIB:-unset}" != "unset" ; then
+          AC_PATH_PROG(PTLIB_CONFIG, ptlib-config, , /usr/share/ptlib/make/)
+        fi
+      fi
+    fi
+  fi
+fi
+
+if test "${HAS_PTLIB:-unset}" = "unset" ; then
+  echo "Cannot find PTLib - please install or set PTLIBDIR and try again"
+  exit
+fi
+
+if test "${PTLIBDIR:-unset}" = "unset" ; then
+  if test "${PTLIB_CONFIG:-unset}" = "unset" ; then
+    echo "Cannot find ptlib-config - please install and try again"
+    exit
+  fi
+  PTLIBDIR=`$PTLIB_CONFIG --prefix`
+fi
+
+echo "PTLib prefix set to $PTLIBDIR"
+
+AC_SUBST(PTLIBDIR)
+
+dnl ########################################################################
+dnl extract the PTLIB version
+if test "${PTLIB_CONFIG:-unset}" = "unset"; then
+  AC_CHECK_FILE(${PTLIBDIR}/version.h, HAS_PTLIB_VERSION_FILE=1)
+  if test "${HAS_PTLIB_VERSION_FILE:-unset}" != "unset"; then
+    PTLIB_MAJOR_VERSION=`cat ${PTLIBDIR}/version.h | grep MAJOR_VERSION | cut -f3 -d' '`
+    PTLIB_MINOR_VERSION=`cat ${PTLIBDIR}/version.h | grep MINOR_VERSION | cut -f3 -d' '`
+    PTLIB_BUILD_NUMBER=`cat ${PTLIBDIR}/version.h | grep BUILD_NUMBER | cut -f3 -d' '`
+    PTLIB_VERSION="${PTLIB_MAJOR_VERSION}.${PTLIB_MINOR_VERSION}.${PTLIB_BUILD_NUMBER}"
+  else
+    AC_CHECK_FILE(${PTLIBDIR}/ptbuildopts.h, HAS_PTLIB_VERSION_FILE=1)
+	if test "${HAS_PTLIB_VERSION_FILE:-unset}" != "unset"; then
+      PTLIB_MAJOR_VERSION=`cat ${PTLIBDIR}/ptbuildopts.h | grep PTLIB_MAJOR | cut -f3 -d' '`
+      PTLIB_MINOR_VERSION=`cat ${PTLIBDIR}/ptbuildopts.h | grep PTLIB_MINOR | cut -f3 -d' '`
+      PTLIB_BUILD_NUMBER=`cat ${PTLIBDIR}/ptbuildopts.h | grep PTLIB_BUILD | cut -f3 -d' '`
+      PTLIB_VERSION="${PTLIB_MAJOR_VERSION}.${PTLIB_MINOR_VERSION}.${PTLIB_BUILD_NUMBER}"
+    fi
+  fi
+else
+  PTLIB_VERSION=`${PTLIB_CONFIG} --version`
+  PTLIB_MAJOR_VERSION=[`echo "${PTLIB_VERSION}" | sed -e "s/\([0-9]*\)\.[0-9]*\.[0-9]*.*/\1/"`]
+  PTLIB_MINOR_VERSION=[`echo "${PTLIB_VERSION}" | sed -e 's/[0-9]*\.\([0-9]*\)\.[0-9]*.*/\1/'`]
+  PTLIB_BUILD_NUMBER=[`echo "${PTLIB_VERSION}" | sed -e 's/[0-9]*\.[0-9]*\.\([0-9]*\).*/\1/'`]
+fi
+if test "${PTLIB_VERSION:-unset}" = "unset" -o "${PTLIB_VERSION}" = ".."; then
+  echo "Error: could not determine PWLib version"
+  exit
+fi
+
+echo "PTLib version is ${PTLIB_VERSION}"
+
+if test ${PTLIB_MAJOR_VERSION} -lt 1; then
+  echo "Error: at leat PWLib version 1.7.5.2 (Pandora) required"
+  exit
+fi
+if test ${PTLIB_MAJOR_VERSION} -eq 1; then
+  if test ${PTLIB_MINOR_VERSION} -lt 7; then
+    echo "Error: at leat PWLib version 1.7.5.2 (Pandora) required"
+    exit
+  elif test ${PTLIB_MINOR_VERSION} -eq 7; then
+    if test ${PTLIB_BUILD_NUMBER} -lt 5; then
+      echo "Error: at leat PWLib version 1.7.5.2 (Pandora) required"
+      exit
+    fi
+  fi
+fi
+
+AC_SUBST(PTLIB_VERSION)
+
+dnl ########################################################################
+dnl look for OpenH323/H323plus, use a preference order of explicit OPENH323DIR, directory
+dnl at same level, home directory, /usr/local or /usr.
+
+NEEDOPENH323PREFIX=0
+
+if test "${OPENH323DIR:-unset}" != "unset" ; then
+  if test -d ${OPENH323DIR}; then
+    AC_CHECK_FILE(${OPENH323DIR}/openh323u.mak, HAS_OPENH323=1)
+  fi
+fi
+if test "${HAS_OPENH323:-unset}" = "unset" ; then
+  if test -d ${PTLIBDIR}/../openh323; then
+    AC_CHECK_FILE(${PTLIBDIR}/../openh323/version.h, HAS_OPENH323=1)
+  fi
+  if test "${HAS_OPENH323:-unset}" != "unset" ; then
+    OPENH323DIR="${PTLIBDIR}/../openh323"
+  else
+    if test -d ${HOME}/openh323/include; then
+      AC_CHECK_FILE(${HOME}/openh323/include/h323.h, HAS_OPENH323=1)
+	fi
+    if test "${HAS_OPENH323:-unset}" != "unset" ; then
+      OPENH323DIR="${HOME}/openh323"
+    else
+	  if test -d /usr/local/include/openh323; then
+        AC_CHECK_FILE(/usr/local/include/openh323/h323.h, HAS_OPENH323=1)
+	  fi
+      if test "${HAS_OPENH323:-unset}" != "unset" ; then
+        OPENH323DIR="/usr/local"
+		OPENH323INSTALLPREFIX="/usr/local"
+		NEEDOPENH323PREFIX=1
+      else
+	    if test -d /usr/include/openh323; then
+          AC_CHECK_FILE(/usr/include/openh323/h323.h, HAS_OPENH323=1)
+		fi
+        if test "${HAS_OPENH323:-unset}" != "unset" ; then
+		  OPENH323DIR="/usr"
+		  OPENH323INSTALLPREFIX="/usr"
+		  NEEDOPENH323PREFIX=1
+        fi
+      fi
+    fi
+  fi
+fi
+
+if test "${HAS_OPENH323:-unset}" = "unset" ; then
+  echo "Cannot find OpenH323/H323Plus - please install or set OPENH323DIR and try again"
+  exit
+fi
+
+if test -d "${OPENH323DIR}/share/openh323"; then
+  OPENH323MAKEDIR=${OPENH323DIR}/share/openh323/
+fi
+
+echo "OpenH323/H323Plus prefix set to $OPENH323DIR"
+
+if test "${OPENH323MAKEDIR:-unset}" = "unset"; then
+  OPENH323MAKEDIR=${OPENH323DIR}
+fi
+
+AC_SUBST(OPENH323DIR)
+AC_SUBST(OPENH323MAKEDIR)
+
+dnl ########################################################################
+dnl extract the OpenH323 version
+if test -d ${OPENH323DIR}; then
+  AC_CHECK_FILE(${OPENH323DIR}/version.h, HAS_OPENH323_VERSIONFILE=1)
+  if test "${HAS_OPENH323_VERSIONFILE:-unset}" != "unset"; then
+    OPENH323_VERSION_FILE=${OPENH323DIR}/version.h
+	OPENH323_MAJOR_VERSION=`cat ${OPENH323_VERSION_FILE} | grep MAJOR_VERSION | cut -f3 -d' '`
+	OPENH323_MINOR_VERSION=`cat ${OPENH323_VERSION_FILE} | grep MINOR_VERSION | cut -f3 -d' '`
+	OPENH323_BUILD_NUMBER=`cat ${OPENH323_VERSION_FILE} | grep BUILD_NUMBER | cut -f3 -d' '`
+  else
+    AC_CHECK_FILE(${OPENH323MAKEDIR}/openh323buildopts.h, HAS_OPENH323_VERSIONFILE=1)
+    if test "${HAS_OPENH323_VERSIONFILE:-unset}" != "unset"; then
+      OPENH323_VERSION_FILE=${OPENH323MAKEDIR}/openh323buildopts.h
+      OPENH323_MAJOR_VERSION=`cat ${OPENH323_VERSION_FILE} | grep OPENH323_MAJOR | cut -f3 -d' '`
+      OPENH323_MINOR_VERSION=`cat ${OPENH323_VERSION_FILE} | grep OPENH323_MINOR | cut -f3 -d' '`
+      OPENH323_BUILD_NUMBER=`cat ${OPENH323_VERSION_FILE} | grep OPENH323_BUILD | cut -f3 -d' '`
+    else
+      AC_CHECK_FILE(${OPENH323MAKEDIR}/../../include/openh323/openh323buildopts.h, HAS_OPENH323_VERSIONFILE=1)
+      if test "${HAS_OPENH323_VERSIONFILE:-unset}" != "unset"; then
+        OPENH323_VERSION_FILE=${OPENH323MAKEDIR}/../../include/openh323/openh323buildopts.h
+        OPENH323_MAJOR_VERSION=`cat ${OPENH323_VERSION_FILE} | grep OPENH323_MAJOR | cut -f2 -d' '`
+        OPENH323_MINOR_VERSION=`cat ${OPENH323_VERSION_FILE} | grep OPENH323_MINOR | cut -f2 -d' '`
+        OPENH323_BUILD_NUMBER=`cat ${OPENH323_VERSION_FILE} | grep "OPENH323_BUILD " | cut -f2 -d' '`
+      fi
+    fi
+  fi
+fi
+if test "${HAS_OPENH323_VERSIONFILE:-unset}" != "unset"; then
+  if test "${OPENH323_MAJOR_VERSION}" = ""; then
+    echo "Error: Could not determine OpenH323/H323Plus version"
+    exit
+  fi
+  OPENH323_VERSION="${OPENH323_MAJOR_VERSION}.${OPENH323_MINOR_VERSION}.${OPENH323_BUILD_NUMBER}"
+  echo "OpenH323 version is ${OPENH323_VERSION}"
+else
+  echo "Error: Could not determine OpenH323/H323Plus version"
+  exit
+fi
+
+if test ${OPENH323_MAJOR_VERSION} -lt 1; then
+  echo "Error: at leat OpenH323/H323Plus version 1.14.4.2 (Pandora) required"
+  exit
+fi
+if test ${OPENH323_MAJOR_VERSION} -eq 1; then
+  if test ${OPENH323_MINOR_VERSION} -lt 14; then
+    echo "Error: at leat OpenH323/H323Plus version 1.14.4.2 (Pandora) required"
+    exit
+  elif test ${OPENH323_MINOR_VERSION} -eq 14; then
+    if test ${OPENH323_BUILD_NUMBER} -lt 4; then
+      echo "Error: at leat OpenH323/H323Plus version 1.14.4.2 (Pandora) required"
+      exit
+    fi
+  fi
+fi
+
+AC_SUBST(OPENH323_VERSION)
+
+dnl ########################################################################
+dnl set the PREFIX accordingly
+if test "x$prefix" = "xNONE"; then
+   INSTALLPREFIX="/usr/local"
+else
+   INSTALLPREFIX="${prefix}"
+fi
+
+AC_SUBST(INSTALLPREFIX)
+
+dnl ########################################################################
+dnl  check for H.460.17
+dnl ########################################################################
+
+dnl MSWIN_DISPLAY    h46017,H.460.17 support
+dnl MSWIN_DEFINE     h46017,HAS_H46017
+
+AC_ARG_ENABLE(h46017, 
+[  --enable-h46017         enable H.460.17 support (default=yes)], 
+[ h46017="${enableval}" ], [h46017="yes"] 
+)
+
+H460SUPPORT=`cat ${OPENH323DIR}/include/openh323buildopts.h | grep 'define H323_H460'`
+if test "${H460SUPPORT:-unset}" = "unset" ; then
+	if test "x${h46017}" != "xno" ; then     
+		AC_MSG_RESULT(No H.460 support available)
+	fi
+	h46017="no"
+fi
+
+if test "x${h46017}" != "xno" ; then     
+   HAS_H46017=1
+   AC_DEFINE(HAS_H46017, 1)
+   STDCCFLAGS="-DHAS_H46017=1 $STDCCFLAGS"
+   echo "H.460.17 support enabled"
+else
+   echo "H.460.17 support disabled"
+   HAS_H46017=0
+fi
+AC_SUBST(HAS_H46017)
+
+dnl ########################################################################
+dnl  Switch for H.460.18 / .19
+dnl ########################################################################
+
+dnl MSWIN_DISPLAY    h46018,H.460.18/.19 support (check patent license)
+dnl MSWIN_DEFAULT    h46018,Disabled
+dnl MSWIN_DEFINE     h46018,HAS_H46018
+
+AC_ARG_ENABLE(h46018, 
+[  --enable-h46018         enable H.460.18 / H.460.19 support (default=no) check patent license before enabling], 
+[ h46018="${enableval}" ], [h46018="no"] 
+)
+
+H460SUPPORT=`cat ${OPENH323DIR}/include/openh323buildopts.h | grep 'define H323_H460'`
+if test "${H460SUPPORT:-unset}" = "unset" ; then
+	if test "x${h46018}" != "xno" ; then     
+		AC_MSG_RESULT(No H.460 support available)
+	fi
+	h46018="no"
+fi
+
+if test "x${h46018}" != "xno" ; then     
+   HAS_H46018=1
+   AC_DEFINE(HAS_H46018, 1)
+   STDCCFLAGS="-DHAS_H46018=1 $STDCCFLAGS"
+   echo "H.460.18 / H.460.19 support enabled"
+else
+   echo "H.460.18 / H.460.19 support disabled"
+   HAS_H46018=0
+fi
+AC_SUBST(HAS_H46018)
+
+dnl ########################################################################
+dnl  check for H.460.23 / .24
+dnl ########################################################################
+
+dnl MSWIN_DISPLAY    h46023,H.460.23/.24 support
+dnl MSWIN_DEFINE     h46023,HAS_H46023
+
+AC_ARG_ENABLE(h46023, 
+[  --enable-h46023         enable H.460.23 / H.460.24 support (default=yes)], 
+[ h46023="${enableval}" ], [h46023="yes"] 
+)
+
+H460SUPPORT=`cat ${OPENH323DIR}/include/openh323buildopts.h | grep 'define H323_H460'`
+if test "${H460SUPPORT:-unset}" = "unset" ; then
+	if test "x${h46023}" != "xno" ; then     
+		AC_MSG_RESULT(No H.460 support available)
+	fi
+	h46023="no"
+fi
+
+if test "x${h46023}" != "xno" ; then     
+   HAS_H46023=1
+   AC_DEFINE(HAS_H46023, 1)
+   STDCCFLAGS="-DHAS_H46023=1 $STDCCFLAGS"
+   echo "H.460.23 / H.460.24 support enabled"
+else
+   echo "H.460.23 / H.460.24 support disabled"
+   HAS_H46023=0
+fi
+AC_SUBST(HAS_H46023)
+
+dnl #########################################################################
+dnl  Check for RADIUS
+dnl ########################################################################
+
+dnl MSWIN_DISPLAY    radius,RADIUS
+dnl MSWIN_CHECK_FILE radius,radacct.h,HAS_RADIUS=1
+
+AC_ARG_ENABLE(radius, 
+[  --enable-radius         enable RADIUS support (default=yes)], 
+[ radius="${enableval}" ], [radius="yes"] 
+)
+	
+if test "x${radius}" != "xno" ; then     
+   HAS_RADIUS=1
+   AC_DEFINE(HAS_RADIUS, 1)
+   STDCCFLAGS="-DHAS_RADIUS=1 $STDCCFLAGS"
+   SOURCES="$SOURCES radproto.cxx radauth.cxx radacct.cxx"
+   HEADERS="$HEADERS radproto.h radauth.h radacct.h"
+   echo "RADIUS support enabled"
+else
+   echo "RADIUS support disabled"
+   HAS_RADIUS=0
+fi
+AC_SUBST(HAS_RADIUS)
+
+dnl #########################################################################
+dnl  Check for LARGE FDSET
+dnl ########################################################################
+AC_ARG_WITH(large-fdset,
+[  --with-large-fdset[=MAXFD]    Maximum number of sockets supported (default=1024)],
+[ largefdset="$withval" ], 
+[ largefdset="no" ]
+)
+
+if test "x${largefdset}" != "xno" ; then     
+	if test "x${largefdset}" = "xyes"; then
+		LARGE_FDSET=8192
+	else
+   		LARGE_FDSET=${largefdset}
+	fi
+   	STDCCFLAGS="-DLARGE_FDSET=${LARGE_FDSET} $STDCCFLAGS"
+   	echo "LARGE FDSET support enabled"
+else
+	echo "LARGE FDSET support disabled"
+fi
+AC_SUBST(LARGE_FDSET)
+
+dnl #########################################################################
+dnl  Check for MySQL
+dnl ########################################################################
+
+dnl MSWIN_DISPLAY    mysql,MySQL
+dnl MSWIN_CHECK_FILE mysql,include\mysql.h,HAS_MYSQL=1
+dnl MSWIN_DIR_SYMBOL mysql,MYSQL_DIR
+dnl MSWIN_CHECK_DIR  mysql,\Program Files\MySQL\MySQL Server 5.0
+
+AC_ARG_ENABLE(mysql, 
+[  --enable-mysql          enable MySQL support (default=yes)], 
+[ mysql="${enableval}" ], [ mysql="yes" ]
+)
+
+AC_ARG_WITH(mysql-include-dir,
+[  --with-mysql-include-dir=DIR  directory where the MySQL includes may be found ],
+[ mysql_include_dir="$withval" ]
+)
+
+AC_ARG_WITH(mysql-dir,
+[  --with-mysql-dir=DIR          base directory where MySQL is installed ],
+[ mysql_include_dir="$withval/include/mysql"
+]
+)
+
+if test "x${mysql}" != "xno"; then
+
+	AC_CHECK_LIB(z, compress, MYSQL_LIBS=" -lz")
+
+	AC_MSG_CHECKING([for mysql.h])
+
+	AC_TRY_COMPILE([#include <mysql.h>], [int a = 1;],
+		MYSQL_INCLUDE=" ",
+		MYSQL_INCLUDE=
+	)
+
+	if test "x$MYSQL_INCLUDE" = "x"; then
+		old_CFLAGS="$CFLAGS"
+
+		for try in /usr/include/mysql /usr/local/include/mysql /usr/local/mysql/include/mysql $mysql_include_dir/mysql; do
+			if test -d $try; then
+				CFLAGS="$old_CFLAGS -I$try"
+				AC_TRY_COMPILE([#include <mysql.h>], [int a = 1;],
+					MYSQL_INCLUDE="-I$try",
+					MYSQL_INCLUDE=
+				)
+				if test "x$MYSQL_INCLUDE" != "x"; then
+					break;
+				fi
+			fi
+		done
+		CFLAGS="$old_CFLAGS"
+	fi
+
+	if test "x$MYSQL_INCLUDE" = "x"; then
+		AC_MSG_RESULT(no)
+		AC_MSG_WARN([mysql headers not found. Use --with-mysql-include-dir=<path>])
+		mysql="no"
+	else
+		sql_mysql_cflags="${sql_mysql_cflags} ${MYSQL_INCLUDE}"
+		AC_MSG_RESULT(yes)
+	fi
+
+	if test "x$mysql" = "xno"; then
+		AC_MSG_WARN([MySQL disabled])
+	fi
+else
+	mysql="no"
+fi
+
+if test "x$mysql" != "xno"; then
+	HAS_MYSQL=1
+	AC_DEFINE(HAS_MYSQL, 1)
+	SOURCES="$SOURCES gksql_mysql.cxx"
+	STDCCFLAGS="${sql_mysql_cflags} -DHAS_MYSQL=1 $STDCCFLAGS"
+    echo "MySQL support enabled"
+else
+    echo "MySQL support disabled"
+	HAS_MYSQL=0
+fi
+AC_SUBST(HAS_MYSQL)
+
+dnl #########################################################################
+dnl  Check for PostgreSQL
+dnl ########################################################################
+
+dnl MSWIN_DISPLAY    pgsql,PostgreSQL
+dnl MSWIN_CHECK_FILE pgsql,\include\libpq-fe.h,HAS_PGSQL=1
+dnl MSWIN_DIR_SYMBOL pgsql,PGSQL_DIR
+dnl MSWIN_CHECK_DIR  pgsql,\postgresql\libpq\
+
+
+AC_ARG_ENABLE(pgsql, 
+[  --enable-pgsql          enable PostgreSQL support (default=yes)], 
+[ pgsql="${enableval}" ], [ pgsql="yes" ]
+)
+
+AC_ARG_WITH(pgsql-include-dir,
+[  --with-pgsql-include-dir=DIR  directory where the PostgreSQL includes may be found ],
+[ pgsql_include_dir="$withval" ]
+)
+
+AC_ARG_WITH(pgsql-dir,
+[  --with-pgsql-dir=DIR          base directory where PostgreSQL is installed ],
+[ pgsql_include_dir="$withval/include"
+]
+)
+
+if test "x${pgsql}" != "xno"; then
+
+	AC_MSG_CHECKING([for libpq-fe.h])
+
+	AC_TRY_COMPILE([#include <libpq-fe.h>], [int a = 1;],
+		PGSQL_INCLUDE=" ",
+		PGSQL_INCLUDE=
+	)
+
+	if test "x$PGSQL_INCLUDE" = "x"; then
+		old_CFLAGS="$CFLAGS"
+
+		for try in /usr/include/pgsql /usr/local/include /usr/local/include/pgsql /usr/local/pgsql/include $pgsql_include_dir; do
+			if test -d $try; then
+				CFLAGS="$old_CFLAGS -I$try"
+				AC_TRY_COMPILE([#include <libpq-fe.h>], [int a = 1;],
+					PGSQL_INCLUDE="-I$try",
+					PGSQL_INCLUDE=
+				)
+				if test "x$PGSQL_INCLUDE" != "x"; then
+					break;
+				fi
+			fi
+		done
+		CFLAGS="$old_CFLAGS"
+	fi
+
+	if test "x$PGSQL_INCLUDE" = "x"; then
+		AC_MSG_RESULT(no)
+		AC_MSG_WARN([pgsql headers not found. Use --with-pgsql-include-dir=<path>])
+		pgsql="no"
+	else
+		sql_pgsql_cflags="${sql_pgsql_cflags} ${PGSQL_INCLUDE}"
+		AC_MSG_RESULT(yes)
+	fi
+
+	if test "x$pgsql" = "xno"; then
+		AC_MSG_WARN([PostgreSQL disabled])
+	fi
+else
+	pgsql="no"
+fi
+
+if test "x$pgsql" != "xno"; then
+	HAS_PGSQL=1
+	AC_DEFINE(HAS_PGSQL, 1)
+	SOURCES="$SOURCES gksql_pgsql.cxx"
+	STDCCFLAGS="${sql_pgsql_cflags} -DHAS_PGSQL=1 $STDCCFLAGS"
+    echo "PostgreSQL support enabled"
+else
+    echo "PostgreSQL support disabled"
+	HAS_PGSQL=0
+fi
+AC_SUBST(HAS_PGSQL)
+
+dnl #########################################################################
+dnl  Check for Firebird
+dnl ########################################################################
+
+dnl MSWIN_DISPLAY    firebird,Firebird
+dnl MSWIN_CHECK_FILE firebird,include\ibase.h,HAS_FIREBIRD=1
+dnl MSWIN_DIR_SYMBOL firebird,FIREBIRD_DIR
+
+AC_ARG_ENABLE(firebird, 
+[  --enable-firebird       enable Interbase/Firebird support (default=yes)], 
+[ firebird="${enableval}" ], [ firebird="yes" ]
+)
+
+AC_ARG_WITH(firebird-include-dir,
+[  --with-firebird-include-dir=DIR  directory where Firebird includes may be found ],
+[ firebird_include_dir="$withval" ]
+)
+
+AC_ARG_WITH(firebird-dir,
+[  --with-firebird-dir=DIR          base directory where Firebird is installed ],
+[ firebird_include_dir="$withval/include"
+]
+)
+
+if test "x${firebird}" != "xno"; then
+
+	AC_MSG_CHECKING([for ibase.h])
+
+	AC_TRY_COMPILE([#include <ibase.h>], [int a = 1;],
+		FIREBIRD_INCLUDE=" ",
+		FIREBIRD_INCLUDE=
+	)
+
+	if test "x$FIREBIRD_INCLUDE" = "x"; then
+		old_CFLAGS="$CFLAGS"
+
+		for try in /usr/include/firebird /usr/local/include /usr/local/include/firebird /usr/local/firebird/include $firebird_include_dir; do
+			if test -d $try; then
+				CFLAGS="$old_CFLAGS -I$try"
+				AC_TRY_COMPILE([#include <ibase.h>], [int a = 1;],
+					FIREBIRD_INCLUDE="-I$try",
+					FIREBIRD_INCLUDE=
+				)
+				if test "x$FIREBIRD_INCLUDE" != "x"; then
+					break;
+				fi
+			fi
+		done
+		CFLAGS="$old_CFLAGS"
+	fi
+
+	if test "x$FIREBIRD_INCLUDE" = "x"; then
+		AC_MSG_RESULT(no)
+		AC_MSG_WARN([Firebird headers not found. Use --with-firebird-include-dir=<path>])
+		firebird="no"
+	else
+		sql_firebird_cflags="${sql_firebird_cflags} ${FIREBIRD_INCLUDE}"
+		AC_MSG_RESULT(yes)
+	fi
+
+	if test "x$firebird" = "xno"; then
+		AC_MSG_WARN([Firebird disabled])
+	fi
+else
+	firebird="no"
+fi
+
+if test "x$firebird" != "xno"; then
+	HAS_FIREBIRD=1
+	AC_DEFINE(HAS_FIREBIRD, 1)
+	SOURCES="$SOURCES gksql_firebird.cxx"
+	STDCCFLAGS="${sql_firebird_cflags} -DHAS_FIREBIRD=1 $STDCCFLAGS"
+    echo "Firebird support enabled"
+else
+    echo "Firebird support disabled"
+	HAS_FIREBIRD=0
+fi
+AC_SUBST(HAS_FIREBIRD)
+
+dnl #########################################################################
+dnl  Check for unixODBC
+dnl ########################################################################
+
+
+dnl MSWIN_DISPLAY    odbc,ODBC support
+dnl MSWIN_CHECK_FILE odbc,include\odbcinst.h,HAS_ODBC=1
+dnl MSWIN_DIR_SYMBOL odbc,ODBC_DIR
+dnl MSWIN_CHECK_DIR  odbc,\Program Files\Microsoft Visual Studio 8\VC\PlatformSDK\
+dnl MSWIN_CHECK_DIR  odbc,\Program Files\Microsoft Visual Studio .NET 2003\VC7\PlatformSDK\
+dnl MSWIN_CHECK_DIR  odbc,\Program Files\Microsoft SDK\include\
+dnl MSWIN_CHECK_DIR  odbc,\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\
+
+
+AC_ARG_ENABLE(unixodbc, 
+[  --enable-unixodbc       enable unixODBC support (default=yes)], 
+[ unixodbc="${enableval}" ], [ unixodbc="yes" ]
+)
+
+AC_ARG_WITH(unixodbc-include-dir,
+[  --with-unixodbc-include-dir=DIR  directory where unixODBC includes may be found ],
+[ unixodbc_include_dir="$withval" ]
+)
+
+AC_ARG_WITH(unixodbc-dir,
+[  --with-unixodbc-dir=DIR          base directory where unixODBC is installed ],
+[ unixodbc_lib_dir="$withval/lib"
+  unixodbc_include_dir="$withval/include"
+]
+)
+
+if test "x${unixodbc}" != "xno"; then
+
+	AC_MSG_CHECKING([for sqlext.h])
+
+	AC_TRY_COMPILE([#include <sqlext.h>], [int a = 1;],
+		UNIXODBC_INCLUDE=" ",
+		UNIXODBC_INCLUDE=
+	)
+
+	if test "x$UNIXODBC_INCLUDE" = "x"; then
+		old_CFLAGS="$CFLAGS"
+
+		for try in /usr/include/unixodbc /usr/local/include /usr/local/include/unixodbc /usr/local/unixodbc/include $unixodbc_include_dir; do
+			if test -d $try; then
+				CFLAGS="$old_CFLAGS -I$try"
+				AC_TRY_COMPILE([#include <sqlext.h>], [int a = 1;],
+					UNIXODBC_INCLUDE="-I$try",
+					UNIXODBC_INCLUDE=
+				)
+				if test "x$UNIXODBC_INCLUDE" != "x"; then
+					break;
+				fi
+			fi
+		done
+		CFLAGS="$old_CFLAGS"
+	fi
+
+	if test "x$UNIXODBC_INCLUDE" = "x"; then
+		AC_MSG_RESULT(no)
+		AC_MSG_WARN([unixODBC headers not found. Use --with-unixodbc-include-dir=<path>])
+		unixodbc="no"
+	else
+		sql_unixodbc_cflags="${sql_unixodbc_cflags} ${UNIXODBC_INCLUDE}"
+		AC_MSG_RESULT(yes)
+	fi
+
+	if test "x$unixodbc" = "xno"; then
+		AC_MSG_WARN([unixODBC disabled])
+	fi
+else
+	unixodbc="no"
+fi
+
+if test "x$unixodbc" != "xno"; then
+	HAS_ODBC=1
+	AC_DEFINE(HAS_ODBC, 1)
+	SOURCES="$SOURCES gksql_odbc.cxx"
+	STDCCFLAGS="${sql_unixodbc_cflags} -DHAS_ODBC=1 $STDCCFLAGS"
+    echo "unixODBC support enabled"
+else
+    echo "unixODBC support disabled"
+	HAS_ODBC=0
+fi
+AC_SUBST(HAS_ODBC)
+
+dnl #########################################################################
+dnl  Check for SQLite
+dnl ########################################################################
+
+dnl MSWIN_DISPLAY    sqlite,SQLite
+dnl MSWIN_CHECK_FILE sqlite,sqlite3.h,HAS_SQLITE=1
+dnl MSWIN_DIR_SYMBOL sqlite,SQLITE_DIR
+dnl MSWIN_CHECK_DIR  sqlite,\sqlite\
+
+
+AC_ARG_ENABLE(sqlite, 
+[  --enable-sqlite         enable SQLite support (default=yes)], 
+[ sqlite="${enableval}" ], [ sqlite="yes" ]
+)
+
+AC_ARG_WITH(sqlite-include-dir,
+[  --with-sqlite-include-dir=DIR  directory where SQLite includes may be found ],
+[ sqlite_include_dir="$withval" ]
+)
+
+AC_ARG_WITH(sqlite-dir,
+[  --with-sqlite-dir=DIR          base directory where SQLite is installed ],
+[ sqlite_include_dir="$withval/include"
+]
+)
+
+if test "x${sqlite}" != "xno"; then
+
+	AC_MSG_CHECKING([for sqlite3.h])
+
+	AC_TRY_COMPILE([#include <sqlite3.h>], [int a = 1;],
+		SQLITE_INCLUDE=" ",
+		SQLITE_INCLUDE=
+	)
+
+	if test "x$SQLITE_INCLUDE" = "x"; then
+		old_CFLAGS="$CFLAGS"
+
+		for try in /usr/include/sqlite /usr/local/include /usr/local/include/sqlite $sqlite_include_dir; do
+			if test -d $try; then
+				CFLAGS="$old_CFLAGS -I$try"
+				AC_TRY_COMPILE([#include <sqlite3.h>], [int a = 1;],
+					SQLITE_INCLUDE="-I$try",
+					SQLITE_INCLUDE=
+				)
+				if test "x$SQLITE_INCLUDE" != "x"; then
+					break;
+				fi
+			fi
+		done
+		CFLAGS="$old_CFLAGS"
+	fi
+
+	if test "x$SQLITE_INCLUDE" = "x"; then
+		AC_MSG_RESULT(no)
+		AC_MSG_WARN([SQLite headers not found. Use --with-sqlite-include-dir=<path>])
+		sqlite="no"
+	else
+		sql_sqlite_cflags="${sql_sqlite_cflags} ${SQLITE_INCLUDE}"
+		AC_MSG_RESULT(yes)
+	fi
+
+	if test "x$sqlite" = "xno"; then
+		AC_MSG_WARN([SQLite disabled])
+	fi
+else
+	sqlite="no"
+fi
+
+if test "x$sqlite" != "xno"; then
+	HAS_SQLITE=1
+	AC_DEFINE(HAS_SQLITE, 1)
+	SOURCES="$SOURCES gksql_sqlite.cxx"
+	STDCCFLAGS="${sql_sqlite_cflags} -DHAS_SQLITE=1 $STDCCFLAGS"
+    echo "SQLite support enabled"
+else
+    echo "SQLite support disabled"
+	HAS_SQLITE=0
+fi
+AC_SUBST(HAS_SQLITE)
+
+dnl ########################################################################
+dnl enable sqlauth, sqlacc if any DB present
+
+if test "x$pgsql" != "xno" -o "x$mysql" != "xno" -o "x$firebird" != "xno" -o "x$unixodbc" != "xno" -o "x$sqlite" != "xno"; then
+	SOURCES="$SOURCES sqlauth.cxx sqlacct.cxx gksql.cxx"
+	HEADERS="$HEADERS sqlacct.h gksql.h"
+fi
+
+dnl #########################################################################
+dnl  Check for libssh
+dnl ########################################################################
+
+dnl MSWIN_DISPLAY    libssh,libSSH
+dnl MSWIN_CHECK_FILE libssh,include\libssh\server.h,HAS_LIBSSH=1
+dnl MSWIN_DIR_SYMBOL libssh,LIBSSH_DIR
+dnl MSWIN_CHECK_DIR  libssh,\libssh\
+
+AC_ARG_ENABLE(libssh, 
+[  --enable-libssh                enable libssh support (default=yes)], 
+[ libssh="${enableval}" ], [ libssh="yes" ]
+)
+
+AC_ARG_WITH(libssh-include-dir,
+[  --with-libssh-include-dir=DIR  directory where libssh includes may be found ],
+[ libssh_include_dir="$withval" ]
+)
+
+AC_ARG_WITH(libssh-lib-dir,
+[  --with-libssh-lib-dir=DIR      directory where libssh libraries may be found ],
+[ libssh_lib_dir="$withval" ]
+)
+
+AC_ARG_WITH(libssh-dir,
+[  --with-libssh-dir=DIR          base directory where libssh is installed ],
+[ libssh_lib_dir="$withval/lib"
+  libssh_include_dir="$withval/include"
+]
+)
+
+if test "x${libssh}" != "xno"; then
+
+	AC_MSG_CHECKING([for libssh/server.h])
+
+	old_CFLAGS="$CFLAGS"
+
+	for try in /usr/include /usr/local/include $libssh_include_dir; do
+		if test -d $try; then
+			CFLAGS="$old_CFLAGS -I$try"
+			AC_TRY_COMPILE([#include <libssh/libssh.h>], [int a = 1;],
+				LIBSSH_INCLUDE="-I$try",
+				LIBSSH_INCLUDE=
+			)
+		fi
+	done
+	CFLAGS="$old_CFLAGS"
+
+	if test "x$LIBSSH_INCLUDE" = "x"; then
+		AC_MSG_RESULT(no)
+		AC_MSG_WARN([libssh headers not found. Use --with-libssh-include-dir=<path>])
+		libssh="no"
+	else
+		libssh_cflags="${libssh_cflags} ${LIBSSH_INCLUDE}"
+		AC_MSG_RESULT(yes)
+
+		AC_MSG_CHECKING([for ssh_handle_key_exchange()/ssh_blocking_flush() in libssh])
+
+		old_LIBS="$LIBS"
+
+		for try in /usr/lib /usr/local/lib $libssh_lib_dir; do
+			if test -d $try; then
+				LIBS="$old_LIBS -lssh -lcrypto -lz -lrt"
+				AC_TRY_LINK([extern ssh_handle_key_exchange(); extern ssh_blocking_flush();], [ssh_handle_key_exchange(); ssh_blocking_flush();],
+					[ LIBSSH_LIBS="-lssh"
+					  LIBSSH_LDFLAGS="-L$try"
+					]
+				)
+				if test "x$LIBSSH_LDFLAGS" != "x"; then
+					break;
+				fi
+			fi
+		done
+		LIBS="$old_LIBS"
+
+		if test "x$LIBSSH_LDFLAGS" = "x"; then
+			AC_MSG_RESULT(no)
+			LIBSSH_INCLUDE=
+			AC_MSG_WARN([libssh lib not found. Use --with-libssh-lib-dir=<path>])
+			libssh="no"
+		else
+			AC_MSG_RESULT(yes) 
+			libssh_ldflags="$libssh_ldflags $LIBSSH_LDFLAGS"
+		fi
+	fi
+
+	libssh_ldflags="$libssh_ldflags $LIBS"
+
+	if test "x$libssh" = "xno"; then
+		AC_MSG_WARN([libssh disabled])
+	fi
+else
+	libssh="no"
+fi
+
+if test "x$libssh" != "xno"; then
+	HAS_LIBSSH=1
+	STDCCFLAGS="${libssh_cflags} -DHAS_LIBSSH=1 $STDCCFLAGS"
+	LDFLAGS="$LIBSSH_LDFLAGS $LDFLAGS"
+	ENDLDLIBS="$LIBSSH_LIBS $ENDLDLIBS"
+    echo "libssh support enabled"
+else
+    echo "libssh support disabled"
+	HAS_LIBSSH=0
+fi
+AC_SUBST(HAS_LIBSSH)
+
+dnl #########################################################################
+dnl  Check for Net-SNMP
+dnl ########################################################################
+
+dnl MSWIN_DISPLAY    netsnmp,Net-SNMP
+dnl MSWIN_CHECK_FILE netsnmp,include\net-snmp\net-snmp-config.h,HAS_NETSNMP=1
+dnl MSWIN_DIR_SYMBOL netsnmp,NETSNMP_DIR
+dnl MSWIN_CHECK_DIR  netsnmp,\net-snmp\
+
+AC_ARG_ENABLE(netsnmp, 
+[  --enable-netsnmp                enable Net-SNMP support (default=yes)], 
+[ netsnmp="${enableval}" ], [ netsnmp="yes" ]
+)
+
+AC_ARG_WITH(netsnmp-include-dir,
+[  --with-netsnmp-include-dir=DIR  directory where Net-SNMP includes may be found ],
+[ netsnmp_include_dir="$withval" ]
+)
+
+AC_ARG_WITH(netsnmp-lib-dir,
+[  --with-netsnmp-lib-dir=DIR      directory where Net-SNMP libraries may be found ],
+[ netsnmp_lib_dir="$withval" ]
+)
+
+AC_ARG_WITH(netsnmp-dir,
+[  --with-netsnmp-dir=DIR          base directory where Net-SNMP is installed ],
+[ netsnmp_lib_dir="$withval/lib"
+  netsnmp_include_dir="$withval/include"
+]
+)
+
+if test "x${netsnmp}" != "xno"; then
+
+	AC_MSG_CHECKING([for net-snmp/net-snmp-config.h])
+
+	old_CFLAGS="$CFLAGS"
+	old_LDFLAGS="$LDFLAGS"
+
+	for try in /usr/include /usr/local/include $netsnmp_include_dir; do
+		if test -d $try; then
+			CFLAGS="$old_CFLAGS -I$try"
+			LDFLAGS="$old_LDFLAGS -L$try/../lib"
+			AC_TRY_COMPILE([#include <net-snmp/net-snmp-config.h>], [int a = 1;],
+				NETSNMP_INCLUDE="-I$try",
+				NETSNMP_INCLUDE=
+			)
+		fi
+	done
+	CFLAGS="$old_CFLAGS"
+	LDFLAGS="$old_LDFLAGS"
+    baseLIBS=`net-snmp-config --base-agent-libs`
+    agentLIBS=`net-snmp-config --netsnmp-agent-libs`
+    externalLIBS=`net-snmp-config --external-agent-libs`
+
+	if test "x$NETSNMP_INCLUDE" = "x"; then
+		AC_MSG_RESULT(no)
+		AC_MSG_WARN([Net-SNMP headers not found. Use --with-netsnmp-include-dir=<path>])
+		netsnmp="no"
+	else
+		netsnmp_cflags="${netsnmp_cflags} ${NETSNMP_INCLUDE}"
+		AC_MSG_RESULT(yes)
+
+		AC_MSG_CHECKING([for Net-SNMP library])
+
+		old_LDFLAGS="$LIBS"
+
+		for try in /usr/lib /usr/local/lib $netsnmp_lib_dir; do
+			if test -d $try; then
+				LDFLAGS="$old_LDFLAGS $baseLIBS $agentLIBS $externalLIBS"
+				AC_TRY_LINK([extern netsnmp_enable_subagent();], [netsnmp_enable_subagent();],
+					[ NETSNMP_LIBS="$baseLIBS $agentLIBS $externalLIBS"
+					  NETSNMP_LDFLAGS="-L$try"
+					]
+				)
+				if test "x$NETSNMP_LDFLAGS" != "x"; then
+					break;
+				fi
+			fi
+		done
+		LDFLAGS="$old_LDFLAGS"
+
+		if test "x$NETSNMP_LDFLAGS" = "x"; then
+			AC_MSG_RESULT(no)
+			NETSNMP_INCLUDE=
+			AC_MSG_WARN([NetSNMP lib not found. Use --with-netsnmp-lib-dir=<path>])
+			netsnmp="no"
+		else
+			AC_MSG_RESULT(yes) 
+			netsnmp_ldflags="$netsnmp_ldflags $NETSNMP_LDFLAGS"
+		fi
+	fi
+
+	netsnmp_ldflags="$netsnmp_ldflags $LIBS"
+
+	if test "x$netsnmp" = "xno"; then
+		AC_MSG_WARN([Net-SNMP disabled])
+	fi
+else
+	netsnmp="no"
+fi
+
+if test "x$netsnmp" != "xno"; then
+	HAS_NETSNMP=1
+	STDCCFLAGS="${netsnmp_cflags} -DHAS_NETSNMP=1 $STDCCFLAGS"
+	LDFLAGS="$NETSNMP_LDFLAGS $LDFLAGS"
+	ENDLDLIBS="$NETSNMP_LIBS $ENDLDLIBS"
+    echo "Net-SNMP support enabled"
+else
+    echo "Net-SNMP support disabled"
+	HAS_NETSNMP=0
+fi
+AC_SUBST(HAS_NETSNMP)
+
+dnl ########################################################################
+dnl make directives
+
+dnl ########################################################################
+dnl extract the GnuGk version
+GNUGK_MAJOR_VERSION=`cat version.h | grep "define GNUGK_MAJOR_VERSION" | cut -f4 -d' '`
+GNUGK_MINOR_VERSION=`cat version.h | grep "define GNUGK_MINOR_VERSION" | cut -f4 -d' '`
+GNUGK_BUILD_NUMBER=`cat version.h | grep "define GNUGK_BUILD_NUMBER" | cut -f4 -d' '`
+GNUGK_BUILD_TYPE=`cat version.h | grep "define GNUGK_BUILD_TYPE" | cut -f4 -d' '`
+GNUGK_VERSION="${GNUGK_MAJOR_VERSION}.${GNUGK_MINOR_VERSION}.${GNUGK_BUILD_NUMBER}"
+echo "GNU Gatekeeper version is ${GNUGK_VERSION}"
+AC_SUBST(GNUGK_VERSION)
+AC_SUBST(GNUGK_MAJOR_VERSION)
+AC_SUBST(GNUGK_MINOR_VERSION)
+AC_SUBST(GNUGK_BUILD_NUMBER)
+AC_SUBST(GNUGK_BUILD_TYPE)
+
+MANUFACTURER="GNU"
+PROGRAMNAME="Gatekeeper"
+
+AC_SUBST(MANUFACTURER)
+AC_SUBST(PROGRAMNAME)
+AC_SUBST(STDCCFLAGS)
+AC_SUBST(LDFLAGS)
+AC_SUBST(ENDLDLIBS)
+AC_SUBST(ENDLDFLAGS)
+AC_SUBST(SOURCES)
+AC_SUBST(HEADERS)
+AC_SUBST(HAS_MSG_NOSIGNAL)
+AC_SUBST(NEEDOPENH323PREFIX)
+AC_SUBST(OPENH323INSTALLPREFIX)
+
+dnl ########################################################################
+dnl Output configured files
+
+AC_CONFIG_HEADERS(gnugkbuildopts.h)
+
+AC_OUTPUT(Makefile)
+

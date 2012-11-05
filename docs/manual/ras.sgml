@@ -1,0 +1,426 @@
+<sect>RAS Configuration
+<p>
+<sect1>Section &lsqb;ReplyToRasAddress&rsqb;
+<p>
+Some messages from endpoints to the gatekeeper (GatekeeperRequest,
+RegistrationRequest and InfoRequestResponse) contain an element
+<it/rasAddress/ where the endpoint tells the gatekeeper where to
+send the response to these messages.
+By default GnuGk will ignore this address and respond to the IP and port
+where it has received the request from. It does so, because some endpoints
+rely on this behavior and in case where eg. a NAT is used, the response may
+not reach the sender if it is sent to another IP and port. Usually endpoints
+will send the RAS messages from their RAS port anyway, so it doesn't make a difference.
+
+This section allows you to define when GnuGk should use the rasAddress inside the
+message it has received instead of the address where it has received the message from.
+
+<descrip>
+<tag/Syntax:/
+
+<tt/network=True|False/
+</descrip>
+
+The network is specified by an IP plus optional CIDR, eg. 192.168.1.0/24.
+The network specifies the IP where the RAS message is received from, the setting specifies
+whether to use the rasAddress. The default is not to use it.
+The rule for the network with the longest netmask is used (the most specific).
+<p>
+
+<descrip>
+<tag/Example:/
+
+In this example messages from the 192.168.0.0/18 will use the rasAddress,
+except for messages coming from the 192.168.4.0/24 network.
+
+<tscreen><verb>
+[ReplyToRasAddress]
+192.168.0.0/18=True
+192.168.4.0/24=False
+</verb></tscreen>
+
+</descrip>
+
+
+<sect1>Section &lsqb;RasSrv::GWPrefixes&rsqb;
+<label id="gwprefixes">
+<p>
+This section configures how dialed E.164 numbers are routed to a specific gateway.
+
+<descrip>
+<tag/Format:/
+<tt>gw-alias=prefix[:=priority][,prefix[:=priority],...]</tt>
+<p>
+Note that you must specify the alias of the gateway.
+If a gateway has registered with the specified alias, all numbers beginning with
+the prefixes are routed to that gateway. Special characters <tt/./ and <tt/!/
+can be used here to match any digit or to disable the prefix.
+A priority can be given to each prefix for each gateway (using := syntax),
+so that if several gateways match the dialed number, the one
+with the highest prefix priority will be selected to route the call (when
+the ActivateFailover switch is ON, the call will be routed to all selected
+gateways in order of the prefix priority).  A smaller value corresponds to
+a higher priority.  Default value is 1.  If the prefix priority
+and overlaps the GatewayPriority (see section <ref id="epconfig"
+name="[EP::...]">), the prefix priority will be preferred.
+
+In the following example, the gateway "test-gw" will be responsible for
+prefixes "02" and "03" with a priority of 3, and for "04" with a priority
+of 1.
+
+<tag/Example:/
+<tt/test-gw=02,03:=3,04:=1/
+</descrip>
+
+<sect1>Section &lsqb;RasSrv::PermanentEndpoints&rsqb;
+<p>
+In this section you may configure endpoints that don't have RAS support
+or that you don't want to be expired. Their records will always
+remain in the registration table of the gatekeeper.
+However, you can still unregister it via the status port.
+Special characters <tt/./ and <tt/!/
+can be used with prefixes here to match any digit and disable the prefix.
+You may use := syntax to set a prefix priority in the same manner as in <ref id="gwprefixes" name="[RasSrv::GWPrefixes]"> section.
+
+Make sure you add at least one prefix for all gateways,
+even if you assign the prefixes elsewhere (eg. in the [EP::...] section),
+otherwise the endpoint won't be considered a gateway and those settings won't apply!
+
+<descrip>
+<tag/Format:/
+<tt>IP[:port]=alias[,alias,...;prefix[:=priority][,prefix[:=priority]]...]</tt>
+<tag/Example:/
+For gateway,
+<quote/<tt/10.0.1.5=MyGW;009,008:=2,0.7:=3//
+For terminal,
+<quote/<tt/10.0.1.10:1720=700//
+</descrip>
+
+
+<sect1>Section &lsqb;RasSrv::RRQFeatures&rsqb;
+<p>
+<itemize>
+<item><tt/AcceptEndpointIdentifier=1/<newline>
+Default: <tt/1/<newline>
+<p>
+Whether to accept <bf/endpointIdentifier/ specified in a full RRQ.
+
+<item><tt/AcceptGatewayPrefixes=1/<newline>
+Default: <tt/1/<newline>
+<p>
+A gateway can register its prefixes with the gatekeeper by sending
+<bf/supportedPrefixes/ in the <bf/terminalType/ field of the RRQ.
+This option defines whether to accept the specified prefixes of a gateway.
+
+<item><tt/AcceptMCUPrefixes=1/<newline>
+Default: <tt/1/<newline>
+<p>
+A MCU can register its prefixes with the gatekeeper by sending 
+<bf/supportedPrefixes/ in the <bf/terminalType/ field of the RRQ.
+This option defines whether to accept the specified prefixes of a MCU.
+
+
+<item><tt/OverwriteEPOnSameAddress=1/<newline>
+Default: <tt/0/<newline>
+<p>
+In some networks an endpoint's IP address may change unexpectedly.  This
+may happen when an endpoint is using a PPP connection (e.g. modem or ADSL).
+This option defines how to handle a registration request (RRQ) from an IP
+address which does not match what we have stored.  The default action is
+to reject the request.  With this option enabled the conflicting request
+will cause an unregister request (URQ) to be sent for the existing IP
+address and the entry to be removed, allowing the endpoint to register
+with the new address.
+
+<item><tt/IRQPollCount=0/<newline>
+Default: <tt/1/<newline>
+<p>
+When the gatekeeper does not receive a keep-alive RRQ from an endpoint
+within the TimeToLive time period, it sends an IRQ message to "poll" the endpoint
+and check if it is alive. After IRQPollCount messages are sent and no reply
+is received, the endpoint is unregistered. To disable this feature (and unregister
+endpoints immediately after TimeToLive timeout), set this variable to 0.
+IRQ poll interval is 60 seconds.
+
+<item><tt/SupportDynamicIP=1/<newline>
+Default: <tt/0/<newline>
+<p>
+When the IP address of an endpoint changes, the gatekeeper can maintain registration. 
+This will force the EP to fully re-register if its IP address changes. 
+
+<item><tt>AccHTTPLink=https://billing.mysite.com?account=%a&amp;password=%p</tt><newline>
+Default: <tt>N/A</tt><newline>
+<p>
+You can assign a URL for clients to access to view billing information.
+If using PacPhone you can also add wildcards for the client to use so the clients 
+H323ID and password can be used to directly access their account information.
+    %a - H323ID   %p - password 
+
+<item><tt>AliasTypeFilter=terminal;h323id,dialeddigits</tt><newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Use this setting where endpoints send multiple H225_AliasAddress and some Aliases are
+shared across multiple registrations. You can filter out the shared alias types for
+any given endpoint type. The registrations will keep all alias types listed in the
+filter setting and remove all others.
+You must have separate AliasTypeFilter entries for each endpoint type.
+Valid endpoint types are: gatekeeper, gateway, mcu and terminal.
+Valid filters are: h323id, dialeddigits, url, transport, email and partynumber.
+NOTE: If no alias is found that match the filter then all aliases are registered.
+</itemize>
+
+
+<sect1>Section &lsqb;RasSrv::ARQFeatures&rsqb;
+<p>
+<itemize>
+<item><tt/ArjReasonRouteCallToGatekeeper=1/<newline>
+Default: <tt/1/<newline>
+<p>
+If enabled, the gatekeeper rejects an answered ARQ without a pre-existing
+CallRec found in the CallTable by reason <bf/routeCallToGatekeeper/
+in routed mode.
+The endpoint shall release the call immediately and re-send call Setup
+to the gatekeeper.
+
+<item><tt/RemoveTrailingChar=#/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Specify the trailing character to be removed in <bf/destinationInfo/.
+For example, if your endpoint incorrectly contains a termination character
+such as `&num;' in <bf/destinationInfo/ you may remove it with this option.
+
+<item><tt/RoundRobinGateways=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Enable/disable round-robin gateway selection if more than one gateway
+matches a dialed number. If disabled, the first available gateway will be selected.
+Otherwise, subsequent calls will be sent to gateways in round-robin fashion.
+
+<item><tt/SendRIP=9000/<newline>
+Default: <tt/0/<newline>
+<p>
+Send a RequestInProgress (RIP) message with this delay value after receiving an ARQ.
+This switch can be used to extend the duration the caller will wait for an answer.
+No RIP is sent when the delay ist set to 0.
+
+</itemize>
+
+<sect1>Section &lsqb;RasSrv::AssignedAlias&rsqb;
+<p>
+This allows the assigning of aliases to endpoints as they register, allowing them to 
+set their fully qualified E.164 or URI addresses.
+
+<descrip>
+<tag/Example:/
+<verb>
+[RasSrv::AssignedAlias]
+1234=3323465777,me@mysite.com 
+</verb>
+</descrip>
+
+<sect1>Section &lsqb;AssignedAliases::SQL&rsqb;
+<p>
+This section configures GnuGk to read the assigned aliases from a database.
+You can use the same database parameters as defined in <ref id="sqlpasswordauth" name="[SQLPasswordAuth]">.
+
+<itemize>
+<item><tt/Query=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Defines the SQL query used to retrieve the assigned aliases from the database.
+
+One parameter is defined:
+<itemize>
+<item><tt/%u/ - endpoint alias
+</itemize>
+<p>
+Sample query string:
+<tscreen><verb>
+SELECT assignedalias FROM users WHERE alias = '%u' AND active
+</verb></tscreen>
+
+</itemize>
+
+<sect1>Section &lsqb;RasSrv::AlternateGatekeeper&rsqb;
+<label id="rassrvalternategatekeeper">
+<p>
+This section allows you to override the global definition of <ref id="alternategks" name="AlternateGKs">
+from the [Gatekeeper::Main] section for certain IPs or IP ranges.
+See there for a detailed definition of the config options.
+
+The network is specified by an IP plus optional CIDR, eg. 192.168.1.0/24.
+The rule for the network with the longest netmask is used (the most specific).
+<p>
+
+<descrip>
+<tag/Example:/
+
+In this example, 192.168.1.10 gets assigned GnuGk10 as alternate gatekeeper,
+while the rest of the 192.168.0.0/18 network will use GnuGk4. Endpoints in
+all other networks will use the globally defined alternate gatekeeper. 
+
+<tscreen><verb>
+[RasSrv::AlternateGatekeeper]
+192.168.0.0/18=1.2.3.4;1719;true;120;GnuGk4
+192.168.1.10=1.2.3.10;1719;true;120;GnuGk10
+</verb></tscreen>
+
+</descrip>
+
+
+<sect1>Section &lsqb;RasSrv::AssignedGatekeeper&rsqb;
+<p>
+This allows the assigning of a gatekeeper based upon the H323ID or the
+apparent source IP address of the registering endpoint.
+The received H323ID in the GRQ is checked to see if it has a prefix
+for an assigned gatekeeper or the IP is in a range of an assigned
+gatekeeper.
+The endpoint is then advised in the GCF to register with that gatekeeper.
+You may have multiple gatekeepers for a specific prefix.  The first
+is assigned as the primary and others are then the alternates.
+(requires H.323v6)
+
+<descrip>
+<tag/Examples:/
+<verb>
+[RasSrv::AssignedGatekeeper]
+;; for endpoint with alias starting with 01234
+01234=192.168.1.100:1719
+;; for endpoint with alias starting with 999
+999=[2a01:4f8:61:2243::99]:1719
+;; for endpoints in the range of 195.71.129.0/24 or 195.71.131.0/24
+^195\.71\.(129|131)\.[0-9]+$=10.10.0.5:1719
+;; for endpoints tarting with ^2a01:
+^2a01:=[2a01:4f8:61:2243::199]:1719
+</verb>
+</descrip>
+
+
+<sect1>Section &lsqb;AssignedGatekeepers::SQL&rsqb;
+<p>
+This section allows <htmlurl url="http://www.gnugk.org/" name="GnuGk"> to read the assigned gatekeepers from a database.
+You can use the same database parameters as defined in <ref id="sqlpasswordauth" name="[SQLPasswordAuth]">.
+
+<itemize>
+<item><tt/Query=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Defines the SQL query used to retrieve the assigned gatekeepers from the database.
+
+Two parameters are defined:
+<itemize>
+<item><tt/%u/ - endpoint alias
+<item><tt/%i/ - endpoint IP
+</itemize>
+<p>
+Sample query string:
+<tscreen><verb>
+SELECT assignedgatekeeper FROM users WHERE alias = '%u' AND active
+</verb></tscreen>
+
+</itemize>
+
+
+<sect1>Section &lsqb;AlternateGatekeepers::SQL&rsqb;
+<p>
+This section allows <htmlurl url="http://www.gnugk.org/" name="GnuGk"> to read the alternate gatekeepers from a database.
+You can use the same database parameters as defined in <ref id="sqlpasswordauth" name="[SQLPasswordAuth]">.
+
+<itemize>
+<item><tt/Query=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Defines the SQL query used to retrieve the alternate gatekeepers from the database.
+
+One parameter is defined:
+<itemize>
+<item><tt/%i/ - endpoint IP
+</itemize>
+<p>
+Sample query string:
+<tscreen><verb>
+SELECT alternategatekeeper FROM users WHERE ip = '%i' AND active
+</verb></tscreen>
+
+</itemize>
+
+
+<sect1>Section &lsqb;NATedEndpoints&rsqb;
+<p>
+The gatekeeper can automatically detect whether an endpoint is behind NAT.
+However, if the detection fails, you can specify it manually in this section.
+
+<descrip>
+<tag/Format:/
+<tt/alias=true | yes | 1/
+<tag/Example:/
+Specify that the endpoint with alias 601 is behind NAT.
+<quote/<tt/601=true//
+</descrip>
+
+
+<sect1>Section &lsqb;GkPresence::SQL&rsqb;
+<p>
+H323 SQL Presence system : Highly Experimental
+Use the <ref id="database" name="common database configuration options">
+to define your database connection for this module.
+<p>
+<itemize>
+<item><tt/IncrementalUpdate=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Whether to poll the database to check for Presence updates
+
+<item><tt/UpdateWorkerTimer=10/<newline>
+Default: <tt/5/<newline>
+<p>
+Sleep time between updating of H.460 Presence information.
+
+<item><tt/QueryList=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a SQL query to be used to perform database lookups to retreive 
+contact information (order is important)
+<itemize>
+<item><tt/%i/ - presence identifier  GUID value create externally.
+<item><tt/%u/ - alias to which the presence information belongs
+<item><tt/%a/ - contact alias
+<item><tt/%s/ - Is subscriber (default should be 0)
+<item><tt/%b/ - contact instruction values 0-subscribe 1-unsubscribe  2-block  3-unblock  4-waiting approval
+<item><tt/%y/ - Whether instruction active (default should be 1)
+<item><tt/%z/ - Update Time (should be current UNIX time)
+<item><tt/%d/ - Display name or friendly name of the alias  (optional)
+<item><tt/%v/ - Path to the contacts URL  (optional)
+<item><tt/%c/ - contact category (optional)  values 0-Audio 1-Video 2-data 3-H.239 4-generic
+<item><tt/%t/ - Incremental Timestamp for query (set by Gatekeeper)
+</itemize>
+<p>
+Example
+QueryList=SELECT subscriptionID,h323id,alias,0,status,1,updated,display,avatar,category FROM subscription WHERE timestamp > '%t' ORDER BY h323id,alias
+<p>
+
+<item><tt/QueryAdd=INSERT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a SQL query to Add contact record to the database
+Example
+QueryAdd=INSERT INTO subscription (subscriptionID,h323id,alias,isSubscriber,display) VALUES('%i','%u','%a','%s', '%d');
+<p>
+
+<item><tt/QueryDelete=Delete .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a SQL query to delete a contact from the database
+Example
+QueryDelete=DELETE FROM subscription WHERE subscriptionID = '%i'
+<p>
+
+item><tt/QueryUpdate=UPDATE .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a SQL query to Update contact record status
+Example
+QueryUpdate=UPDATE subscription SET status = '%b' WHERE subscriptionID = '%i'
+<p>
+</itemize>
+

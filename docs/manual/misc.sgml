@@ -1,0 +1,935 @@
+<sect>Advanced Configuration
+<p>
+<sect1>Section &lsqb;CallTable&rsqb;
+<label id="calltable">
+<p>
+<itemize>
+<item><tt/GenerateNBCDR=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Generate CDRs for calls from neighbor zones on the status port.
+The IP and endpoint ID of the calling party is printed as empty.
+This is usually used for debugging purposes.
+The accounting modules will always get CDR data for all calls.
+
+<item><tt/GenerateUCCDR=0/<newline>
+Default: <tt/0/<newline>
+<p>
+Generate CDRs for calls that are unconnected. This is usually
+used for debugging purposes. Note that a call is considered unconnected
+only if the gatekeeper uses routed mode and a Q.931 "Connect" message is not
+received by the gatekeeper. In direct mode, a call is always considered
+connected.
+
+<item><tt/DefaultCallDurationLimit=3600/<newline>
+Default: <tt/0/<newline>
+<p>
+Default maximum call duration limit (seconds).
+Set it to <tt/0/ to disable this feature and not limit
+call duration.
+
+<item><tt/AcctUpdateInterval=60/<newline>
+Default: <tt/0/<newline>
+<p>
+A time interval (seconds) for accounting updates to be logged
+for each call in progress. The exact details of the accounting updates
+depend on accounting logger modules selected (see section
+<ref id="gkacct" name="[Gatekeeper::Acct]">). In general, the accounting
+update is to provide back-end services with incrementing call duration
+for connected calls.
+The default value "0" disables accounting updates.
+Please note that setting this to a short interval may decrease gatekeeper performance.
+
+<item><tt/TimestampFormat=Cisco/<newline>
+Default: <tt/RFC822/<newline>
+<p>
+Format of timestamp strings printed inside CDRs. You can use the same list of formats as specified in the <ref id="gkmain" name="[Gatekeeper::Main]"> section.
+
+<item><tt/IRRFrequency=60/<newline>
+Default: <tt/120/<newline>
+<p>
+Set the irrFrequency in ACF messages. 0 turns it off.
+
+<item><tt/IRRCheck=TRUE/<newline>
+Default: <tt/FALSE/<newline>
+<p>
+Check if both endpoints in a call send the requested IRRs.
+A call will be terminated if one of the endpoints do not send
+an IRR after 2 * irrFrequency.
+
+<item><tt/SingleFailoverCDR=FALSE/<newline>
+Default: <tt/TRUE/<newline>
+<p>
+When failover is active, more than one gateway may be tried to
+establish a call. This switch defines if one or multiple CDRs
+are generated for such a call.
+
+<item><tt/DisabledCodecs=g711Alaw64k;g711Ulaw64k;h263VideoCapability;genericVideoCapability/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Filter out certain codecs. Calls must be H.245 routed or proxied for codec filtering to work.
+This setting can be overridden on a per-call basis by using the Radius attribute 'disable-codec'.
+The filtering does not apply to codecs used in encrypted calls.
+
+</itemize>
+
+<sect1>Section &lsqb;H225toQ931&rsqb;
+<label id="h225toq931">
+<p>
+When converting between H.225 reasons and Q.931 cause codes, GnuGk
+uses a conversion table. Using this section you can change this mapping.
+
+<quote><tt>[H225toQ931]<newline>
+;0=34 # noBandwidth<newline>
+;1=47 # gatekeeperResources<newline>
+2=34 # unreachableDestination => NoCircuitChannelAvailable (default 3)<newline>
+;3=16 # destinationRejection<newline>
+;4=88 # invalidRevision<newline>
+;5=111 # noPermission<newline>
+;6=38 # unreachableGatekeeper<newline>
+;7=42 # gatewayResources<newline>
+;8=28 # badFormatAddress<newline>
+;9=41 # adaptiveBusy<newline>
+;10=17 # inConf<newline>
+;11=31 # undefinedReason<newline>
+;12=16 # facilityCallDeflection<newline>
+;13=31 # securityDenied<newline>
+14=34 # calledPartyNotRegistered => NoCircuitChannelAvailable (default 20)<newline>
+;15=31 # callerNotRegistered<newline>
+;16=47 # newConnectionNeeded<newline>
+;17=127 # nonStandardReason<newline>
+;18=31 # replaceWithConferenceInvite<newline>
+;19=31 # genericDataReason<newline>
+;20=31 # neededFeatureNotSupported<newline>
+;21=127 # tunnelledSignallingRejected<newline></tt></quote>
+
+<sect1>Section &lsqb;GkQoSMonitor&rsqb;
+<label id="gkqosmonitor">
+<p>
+Use H.460.9 to collect Quality of Service information from endpoints.
+Endpoints must support H.460.9 for this service to function.
+
+<itemize>
+<item><tt/Enable=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Defines whether to enable or disable the feature. If enabled, this function
+will respond to supportedFeature requests from clients so clients know to
+send QoS statistics to the gatekeeper.
+
+<item><tt/CallEndOnly=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Defines whether to collect the information via IRR messages or only collect
+QoS information at the end of a call. 
+
+<item><tt/DetailFile=qos.txt/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define the output file for QoS logs. If a file is not defined the
+QoS information is output as an item in the Trace File at trace level 4.
+</itemize>
+
+<sect1>Section &lsqb;GkQoSMonitor::SQL&rsqb;
+<p>
+This section allows you to store QoS information in a database.
+You can use the same database parameters as defined in <ref id="sqlpasswordauth" name="[SQLPasswordAuth]">.
+
+<itemize>
+<item><tt/Query=INSERT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Defines the SQL query used to store the QoS information.
+
+The following parameters are defined:
+<itemize>
+<item><tt/%g/ - gatekeeper ID
+<item><tt/%{ConfId}/ - conference ID
+<item><tt/%{session}/ - session
+<item><tt/%{caller-ip}/ - caller IP
+<item><tt/%{caller-port}/ - caller port
+<item><tt/%{caller-nat}/ - is caller NATted (0 or 1)
+<item><tt/%{callee-ip}/ - caller IP
+<item><tt/%{callee-port}/ - caller port
+<item><tt/%{avgdelay}/ - average delay
+<item><tt/%{packetloss}/ - packet loss
+<item><tt/%{packetloss-percent}/ - packet loss percentage
+<item><tt/%{avgjitter}/ - average jitter
+<item><tt/%{bandwidth}/ - bandwidth (in units of 100 bits per second)
+<item><tt/%t/ - timestamp
+
+</itemize>
+<p>
+Sample query string:
+<tscreen><verb>
+INSERT INTO qos SET caller_ip="%{caller-ip}", bandwidth="%{bandwidth}, timestamp=%t
+</verb></tscreen>
+
+</itemize>
+
+<sect1>Section &lsqb;Endpoint&rsqb;
+<label id="endpoint">
+<p>
+The gatekeeper can function as an endpoint by registering with another gatekeeper, allowing
+you to build gatekeeper hierarchies.
+This section defines the endpoint features for the gatekeeper.
+
+<itemize>
+<item><tt/Gatekeeper=10.0.1.1/<newline>
+Default: <tt/no/<newline>
+<p>
+Define a parent gatekeeper for <htmlurl url="http://www.gnugk.org/" name="GnuGk"> to register with.
+When a call in the routing process reaches the 'parent' routing policy,
+it will route all calls to this gatekeeper.
+If you set this to <tt/auto/, GnuGk will send an IPv4 broadcast GRQ.
+
+Make sure you don't register with yourself, the results can be very confusing.
+
+<item><tt/Type=Gateway/<newline>
+Default: <tt/Gateway/<newline>
+<p>
+Define the terminal type GnuGk will use when it registers.
+Valid options are <tt/Gateway/ or <tt/Terminal/.
+
+<item><tt/Vendor=Cisco | GnuGk | Generic/<newline>
+Default: <tt/GnuGk/<newline>
+<p>
+Choose parent gatekeeper type to enable vendor specific extensions.  This
+setting can also be configured by specifying the triplet of T.35 IDs
+(&lt;country&gt;,&lt;manufacturer&gt;,&lt;extension&gt;) for the vendor to
+set the vendor ID without enabling any extensions.
+
+<descrip>
+<tag/Examples:/
+<tscreen><verb>
+Vendor=GnuGk
+; Aculab ID
+Vendor=222,173,0
+</verb></tscreen>
+</descrip>
+
+<item><tt/HideGk=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Hide the fact that a gatekeeper is registering, eg. don't set gatekeeper flag in terminal type.
+
+<item><tt/ProductId=Any Product Name/<newline>
+Default: <tt/GnuGk's name/<newline>
+<p>
+This setting will allow you to configure the "product ID" string used in the
+registration request.  The primary use of this setting would be to solve
+interoperability issues.
+
+<item><tt/ProductVersion=1.2.3/<newline>
+Default: <tt/GnuGk version/<newline>
+<p>
+This setting allows you to configure the product version string in the
+registration request in order to solve interoperability issues.
+
+<item><tt/H323ID=ProxyGK/<newline>
+Default: <tt>&lt;Name&gt;</tt><newline>
+<p>
+Specify the H.323 ID aliases for the endpoint.
+Multiple aliases can be separated with a comma.
+
+<item><tt/E164=18888600000,18888700000/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define the E.164 (dialedDigits) aliases for the endpoint.
+Multiple aliases can be separated with a comma.
+
+<item><tt/Password=123456/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Specify a password to be sent to the parent gatekeeper.
+
+All RAS requests will contain the password in the <bf/cryptoTokens/ field
+(MD5 & HMAC-SHA1-96) and the <bf/tokens/ field (CAT).
+To send RAS requests without the <bf/cryptoTokens/ and <bf/tokens/ fields,
+configure an empty password.
+If <tt/EncryptAllPasswords/ is enabled, or a <tt/KeyFilled/ variable is defined
+in this section, the password is in encrypted form and should be created using
+the <tt/addpasswd/ utility.
+<p>
+The password will be used in LRQs sent to neighbor gatekeepers.
+
+<item><tt/Prefix=188886,188887/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Register the specified prefixes with the parent gatekeeper.
+Only takes effect when the Type is <tt/Gateway/.
+
+<item><tt/TimeToLive=900/<newline>
+Default: <tt>60</tt><newline>
+<p>
+Suggest a time-to-live value (in seconds) for the registration.
+Note that the real time-to-live timer is assigned by the parent
+gatekeeper in the RCF is sends to us in response to our RRQ.
+
+<item><tt/RRQRetryInterval=10/<newline>
+Default: <tt/3/<newline>
+<p>
+Define a retry interval in seconds for resending an RRQ if no response 
+is received from the parent gatekeeper. This interval is doubled with each
+failure, up to a maximum RRQRetryInterval * 128 timeout.
+
+<item><tt/UnregisterOnReload=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Defines whether the child gatekeeper unregisters and re-registers with
+its parent after receiving a Reload command from the status port.
+
+<item><tt/NATRetryInterval=60/<newline>
+Default: <tt/60/<newline>
+<p>
+How long to wait before trying to reconnect TCP NAT signaling socket (seconds).
+This can happen when either the connection cannot be established or it has
+been broken.
+
+<item><tt/NATKeepaliveInterval=86400/<newline>
+Default: <tt/86400/<newline>
+<p>
+Define how often the TCP NAT signaling connection with a parent gatekeeper
+is refreshed. As NAT boxes usually keep TCP mappings for a certain duration,
+it's strongly suggested to set this to a value slightly shorter than the NAT box mapping timeout.
+Refreshing is done by sending a special Q.931 IncomingCallProceeding message.
+If your NAT performs TCP port translation, you may need to set it to a value
+as short as 60 seconds.
+
+<item><tt/Discovery=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Configures GnuGk to attempt to discover the parent gatekeeper by first sending a GRQ.
+
+<item><tt/UseAlternateGK=0/<newline>
+Default: <tt/1/<newline>
+<p>
+
+Enable alternate gatekeepers feature. If GRJ/GCF/RCF messages received 
+from a parent gatekeeper contain a list of alternate gatekeepers, this
+information is stored and can be used to re-register with another gatekeeper
+in case of failure. If you don't want to use this feature, set this
+variable to <tt/0/.
+
+<item><tt/GatekeeperIdentifier=ParentGK/<newline>
+Default: <tt/Not set/<newline>
+<p>
+Define this parameter if you only want to accept parent gatekeepers that match
+this gatekeeper identifier. Useful with GRQ discovery and can prevent 
+an accidental gatekeeper match. Do not set this variable if you do not
+care about gatekeeper identifiers or you use alternate gatekeepers that
+can have different gatekeeper identifiers.
+
+<item><tt/EndpointIdentifier=ChildGK/<newline>
+Default: <tt/Not set/<newline>
+<p>
+Set this if you want to use a specific endpoint identifier for this child
+gatekeeper. If this option is not set (default), the identifier is assigned
+by a parent gatekeeper in a GCF/RCF message.
+
+<item><tt/ForwardDestIp=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Forward the destCallSignalAddress in ARQs to the parent gatekeeper.
+</itemize>
+
+<sect1>Section &lsqb;CTI::Agents&rsqb;
+<p>
+This section allows the configuration of a so-called virtual queue to
+allow inbound call distribution by an external application via the
+status port.
+A virtual queue has a H.323 alias that can be called like an endpoint
+or it can answer to a set of aliases.
+
+Once a call arrives on the virtual queue, the gatekeeper signals
+a RouteRequest on the status port and waits for an external application
+to respond with either a RouteReject (which will cause the call to be rejected)
+or with RouteToAlias/RouteToGateway which leads to the destination being rewritten so the call
+will be routed to the alias (eg. call center agent) specified by
+the external application.
+
+If no answer is received after a timeout period, the call is terminated.
+
+You can specify virtual queues in three ways:
+<itemize>
+<item><tt/exact alias name/ - a list of aliases is given. If a request destination
+  alias matches one these names, the virtual queue is activated.
+<item><tt/prefix/ - a list of prefixes is given. If a request destination alias
+  starts with one these prefixes, the virtual queue is activated.
+<item><tt/regular expression/ - a regular expression is given. If a request destination
+  alias matches the expression, the virtual queue is activated.
+</itemize>
+
+To apply the virtual queue to all calls, specify a regular expression that matches everything, see the example below.
+
+See the monitoring section for details on the messages and responses.
+
+<itemize>
+<item>
+<tt/VirtualQueueAliases/<newline>
+Default: <tt>none</tt><newline>
+<p>
+This defines a list of H.323 aliases for the virtual queues (used with the vqueue RoutingPolicy).
+
+<descrip>
+<tag/Example:/
+<quote/<tt/VirtualQueueAliases=sales,support//
+<newline>
+</descrip>
+
+<item>
+<tt/VirtualQueuePrefixes/<newline>
+Default: <tt>none</tt><newline>
+<p>
+This defines a list of prefixes for the virtual queues (used with the vqueue RoutingPolicy).
+
+<descrip>
+<tag/Example:/
+<quote/<tt/VirtualQueuePrefixes=001215,1215//
+<newline>
+</descrip>
+
+<item>
+<tt/VirtualQueueRegex/<newline>
+Default: <tt>none</tt><newline>
+<p>
+This defines a regular expression for the virtual queues (used with the vqueue RoutingPolicy).
+
+<descrip>
+<tag/Example (numbers starting with 001215 or 1215):/
+<quote/<tt/VirtualQueueRegex=^(001|1)215[0-9]*$//
+<newline>
+<tag/Example to match all calls:/
+<quote/<tt/VirtualQueueRegex=^.*$//
+<newline>
+</descrip>
+
+<item>
+<tt/RequestTimeout/<newline>
+Default: <tt/10/<newline>
+Timeout in seconds for the external application to answer the RouteRequest.
+If no answer is received during this time the call will be rejected.
+</itemize>
+
+
+<sect1>Section &lsqb;CTI::MakeCall&rsqb;
+<label id="ctimakecall">
+<p>This section contains the settings for the status port command <ref id="makecall" name="MakeCall">.
+<itemize>
+<item>
+<tt/EndpointAlias=DialOut/<newline>
+Default: <tt>InternalMakeCallEP</tt><newline>
+<p>
+This defines the endpoint alias for the pseudo endpoint used to dial.
+
+<item>
+<tt/TransferMethod=H.450.2/<newline>
+Default: <tt>FacilityForward</tt><newline>
+<p>
+Set the method to transfer the call from the pseudo endpoint to the actual destination. Possible values are:
+FacilityForward, FacilityRouteCallToMC and H.450.2.
+
+<item>
+<tt/UseH450=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Use a H.450.2 transfer instead of a Facility message to transfer the call from the pseudo endpoint to the actual destination. <bf>Deprecated: Use TransferMethod= instead.</bf>
+
+<item>
+<tt/Gatekeeper=192.168.1.2/<newline>
+Default: <tt>127.0.0.1</tt><newline>
+<p>
+Gatekeeper IP for the pseudo endpoint to register with.
+
+<item>
+<tt/Interface=192.168.1.1:1730/<newline>
+Default: <tt>*:1722</tt><newline>
+<p>
+Interface and port to use for the pseudo endpoint.
+
+<item>
+<tt/DisableFastStart=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Disable FastStart for the pseudo endpoint.
+
+<item>
+<tt/DisableH245Tunneling=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Disable H.245 tunneling for the pseudo endpoint.
+
+</itemize>
+
+
+<sect1>Section &lsqb;SQLConfig&rsqb;
+<label id="sqlconf">
+<p>
+Load gatekeeper settings from a SQL database (in addition to settings
+read from the config file). A generic <tt/ConfigQuery/ can be used
+to read almost all setting from the database and/or one of <tt/[RasSrv::RewriteE164]/,
+<tt/[RasSrv::PermanentEndpoints]/, <tt/[RasSrv::Neighbors]/, 
+<tt/[RasSrv::GWPrefixes]/ queries can be used to load particular settings.
+Entries read from the SQL database take precedence over settings found
+in the config file.
+
+Use the <ref id="database" name="common database configuration options">
+to define your database connection for this module.
+
+<itemize>
+<item><tt/ConfigQuery=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a SQL query used to read gatekeeper settings from the database. 
+The query is parameterized - that means parameter replacement occurs before 
+the query is executed. Parameter placeholders are denoted by <bf/%1/, <bf/%2/, ... 
+strings. Specify %% to embed a percent character before a digit in a string 
+(like <bf/%%1/), specify <bf/%{1}/ to allow expansion inside complex expressions 
+like <bf/%{1}123/. For <tt/ConfigQuery/ only one parameter is defined:
+<itemize>
+<item><tt/%1/ - the gatekeeper identifier
+</itemize>
+It is expected that the query returns zero or more rows of data,
+with each row consisting of <bf/three/ columns:
+<itemize>
+<item><tt/column at index 0/ - config section name
+<item><tt/column at index 1/ - config key (option name)
+<item><tt/column at index 2/ - config value (option value)
+</itemize>
+<p>
+Sample query strings:
+<tscreen><verb>
+ConfigQuery=SELECT secname, seckey, secval FROM sqlconfig WHERE gk = '%1'
+ConfigQuery=SELECT 'RasSrv::RRQAuth', alias, rule FROM rrqauth WHERE gk = '%1'
+</verb></tscreen>
+
+<item><tt/RewriteE164Query=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a SQL query used to retrieve rewrite rules from the database
+for the <tt/[RasSrv::RewriteE164]/ section. The query is parameterized 
+- that means parameter replacement occurs before each query is executed. 
+Parameter placeholders are denoted by <bf/%1/, <bf/%2/, ... strings. 
+Specify %% to embed a percent character before a digit into string 
+(like <bf/%%1/), specify <bf/%{1}/ to allow expansion inside complex expressions 
+like <bf/%{1}123/. For <tt/RewriteE164Query/ only one parameter is defined:
+<itemize>
+<item><tt/%1/ - the gatekeeper identifier
+</itemize>
+It is expected that the query returns zero or more rows of data,
+with each row consisting of two columns:
+<itemize>
+<item><tt/column at index 0/ - rewrite rule key
+<item><tt/column at index 1/ - rewrite rule value
+</itemize>
+<p>
+Sample query strings:
+<tscreen><verb>
+RewriteE164Query=SELECT rkey, rvalue FROM rewriterule WHERE gk = '%1'
+</verb></tscreen>
+
+<item><tt/RewriteAliasQuery=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a SQL query used to retrieve rewrite rules from the database
+for the <tt/[RasSrv::RewriteAlias]/ section. The query is parameterized 
+- that means parameter replacement occurs before each query is executed. 
+Parameter placeholders are denoted by <bf/%1/, <bf/%2/, ... strings. 
+Specify %% to embed a percent character before a digit into string 
+(like <bf/%%1/), specify <bf/%{1}/ to allow expansion inside complex expressions 
+like <bf/%{1}123/. For <tt/RewriteAliasQuery/ only one parameter is defined:
+<itemize>
+<item><tt/%1/ - the gatekeeper identifier
+</itemize>
+It is expected that the query returns zero or more rows of data,
+with each row consisting of two columns:
+<itemize>
+<item><tt/column at index 0/ - rewrite rule key
+<item><tt/column at index 1/ - rewrite rule value
+</itemize>
+<p>
+Sample query strings:
+<tscreen><verb>
+RewriteAliasQuery=SELECT rkey, rvalue FROM assignedalias WHERE gk = '%1'
+</verb></tscreen>
+
+<item><tt/AssignedAliasQuery=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a SQL query used to retrieve rewrite rules from the database
+for the <tt/[RasSrv::AssignedAlias]/ section. The query is parameterized 
+- that means parameter replacement occurs before each query is executed. 
+Parameter placeholders are denoted by <bf/%1/, <bf/%2/, ... strings. 
+Specify %% to embed a percent character before a digit into string 
+(like <bf/%%1/), specify <bf/%{1}/ to allow expansion inside complex expressions 
+like <bf/%{1}123/. For <tt/AssignedAliasQuery/ only one parameter is defined:
+<itemize>
+<item><tt/%1/ - the gatekeeper identifier
+</itemize>
+It is expected that the query returns zero or more rows of data,
+with each row consisting of two columns:
+<itemize>
+<item><tt/column at index 0/ - rewrite rule key
+<item><tt/column at index 1/ - rewrite rule value
+</itemize>
+<p>
+Sample query strings:
+<tscreen><verb>
+AssignedAliasQuery=SELECT rkey, rvalue FROM assignedalias WHERE gk = '%1'
+</verb></tscreen>
+
+<item><tt/NeighborsQuery=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a SQL query used to retrieve neighbor entries from the database
+for the <tt/[RasSrv::Neighbors]/ section. The query is parameterized 
+- that means parameter replacement occurs before each query
+is executed. Parameter placeholders are denoted by <bf/%1/, <bf/%2/, ... 
+strings. Specify %% to embed a percent character before a digit into string 
+(like <bf/%%1/), specify <bf/%{1}/ to allow expansion inside complex expressions 
+like <bf/%{1}123/. For <tt/NeighborsQuery/ one parameter is defined:
+<itemize>
+<item><tt/%1/ - the gatekeeper identifier
+</itemize>
+It is expected that the query returns zero or more rows of data,
+with each row consisting of six columns:
+<itemize>
+<item><tt/column at index 0/ - neighbor name (identifier)
+<item><tt/column at index 1/ - neighbor IP address
+<item><tt/column at index 2/ - neighbor port number
+<item><tt/column at index 3/ - optional prefixes (comma separated)
+<item><tt/column at index 4/ - optional password
+<item><tt/column at index 5/ - optional dynamic IP flag
+</itemize>
+<p>
+Sample query strings:
+<tscreen><verb>
+NeighborsQuery=SELECT nid, nip, nport, npfx, NULL, 0 FROM neighbor WHERE gk = '%1'
+</verb></tscreen>
+
+<item><tt/PermanentEndpointsQuery=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a SQL query used to retrieve permanent endpoints from the database 
+for the <tt/[RasSrv::PermanentEndpoints]/ section. The query is parameterized 
+- that means parameter replacement occurs before each query
+is executed. Parameter placeholders are denoted by <bf/%1/, <bf/%2/, ... 
+strings. Specify %% to embed a percent character before a digit into string 
+(like <bf/%%1/), specify <bf/%{1}/ to allow expansion inside complex expressions 
+like <bf/%{1}123/. For <tt/PermanentEndpointsQuery/ only one parameter is defined:
+<itemize>
+<item><tt/%1/ - the gatekeeper identifier
+</itemize>
+It is expected that the query returns zero or more rows of data,
+with each row consisting of four columns:
+<itemize>
+<item><tt/column at index 0/ - permanent endpoint IP address
+<item><tt/column at index 1/ - permanent endpoint port number
+<item><tt/column at index 2/ - permanent endpoint alias
+<item><tt/column at index 3/ - optional permanent endpoint prefixes (comma separated)
+</itemize>
+<p>
+Sample query strings:
+<tscreen><verb>
+PermanentEndpointsQuery=SELECT peip, 1720, pealias, NULL FROM permanentep WHERE gk = '%1'
+</verb></tscreen>
+
+<item><tt/GWPrefixesQuery=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define a SQL query used to retrieve gateway prefixes from the database 
+for the <tt/[RasSrv::GWPrefixes]/ section. The query is parameterized 
+- that means parameter replacement is made before each query
+is executed. Parameter placeholders are denoted by <bf/%1/, <bf/%2/, ... 
+strings. Specify %% to embed a percent character before a digit into string 
+(like <bf/%%1/), specify <bf/%{1}/ to allow expansion inside complex expressions 
+like <bf/%{1}123/. For <tt/GWPrefixesQuery/ only one parameter is defined:
+<itemize>
+<item><tt/%1/ - the gatekeeper identifier
+</itemize>
+It is expected that the query returns zero or more rows of data,
+with each row consisting of two columns:
+<itemize>
+<item><tt/column at index 0/ - gateway alias
+<item><tt/column at index 1/ - gateway prefixes (comma separated)
+</itemize>
+<p>
+Sample query strings:
+<tscreen><verb>
+GWPrefixesQuery=SELECT gwalias, gwpfx FROM gwprefix WHERE gk = '%1'
+</verb></tscreen>
+
+</itemize>
+
+<sect1>Section &lsqb;PortNotifications&rsqb;
+<p>
+GnuGk can execute a system command whenever it opens a new port for listening.
+For example, this can be used to automatically update the firewall configuration.
+<p>
+The following placeholder are available:
+<itemize>
+<item><tt/%p/ - protocol ("udp" or "tcp")
+<item><tt/%n/ - port number
+<item><tt/%i/ - IP
+</itemize>
+<p>
+By configuring a command to run for some types of ports, but not for others,
+you can easily choose which ports to handle and which to ignore.
+<p>
+<itemize>
+<item><tt>Q931PortOpen=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>Q931PortClose=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>H245PortOpen=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>H245PortClose=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>RTPPortOpen=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>RTPPortClose=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>T120PortOpen=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>T120PortClose=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>RASPortOpen=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>RASPortClose=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>StatusPortOpen=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>StatusPortClose=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>RadiusPortOpen=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+<item><tt>RadiusPortClose=/usr/local/bin/ports.sh %p %n %i</tt><newline>
+Default: <tt/none/<newline>
+<p>
+</itemize>
+
+<descrip>
+Example:
+<tscreen><verb>
+[PortNotifications]
+Q931PortOpen=/usr/local/bin/ports.sh %p %n %i
+Q931PortClose=/usr/local/bin/ports.sh %p %n %i
+H245PortOpen=/usr/local/bin/ports.sh %p %n %i
+H245PortClose=/usr/local/bin/ports.sh %p %n %i
+RTPPortOpen=/usr/local/bin/ports.sh %p %n %i
+RTPPortClose=/usr/local/bin/ports.sh %p %n %i
+RASPortOpen=/usr/local/bin/ports.sh %p %n %i
+RASPortClose=/usr/local/bin/ports.sh %p %n %i
+T120PortOpen=/usr/local/bin/ports.sh %p %n %i
+T120PortClose=/usr/local/bin/ports.sh %p %n %i
+</verb></tscreen>
+</descrip>
+
+<sect1>Section &lsqb;SNMP&rsqb;
+<label id="snmp">
+<p>
+The Simple Network Management Protocol (SNMP) lets you monitor the GNU
+Gatekeeper during operation and allows you to configure a destination system
+for notifications ("traps") when an error occurs.
+<itemize>
+<item><tt/EnableSNMP=1/<newline>
+Default: <tt>0</tt><newline>
+Enable SNMP support. GnuGk must be compiled with SNMP support.
+
+<item><tt/Implementation=PTLib/<newline>
+Default: <tt>Net-SNMP</tt><newline>
+Select the SNMP implementation to use. Possible values are <tt>Net-SNMP</tt>, <tt>PTLib</tt> and <tt>Windows</tt>.
+</itemize>
+
+If the GnuGk configuration file enables SNMP, and the Net-SNMP implementation is selected,
+then GnuGk will register as an AgentX sub-agent with
+the Net-SNMP daemon.  By default GnuGk will connect to the localhost IP address (127.0.0.1) and TCP
+port 705. Registering as a sub-agent allows you to continue querying Net-SNMP about
+the general health of the server and adds a GnuGk specific object.
+
+All GET / SET requests and SNMP traps are performed by the Net-SNMP daemon,
+so configuration of access control, trap destination and SNMP version
+information must be done in the Net-SNMP .conf file.
+
+If PTLib's SNMP implementation is selected, GnuGk starts a standalone SNMP agent.
+<bf>NOTE</bf>: Only one SNMP agent can bind to UDP/161, so you might have to use a
+non-standard port if you are using another SNMP agent on your server.
+
+<bf>NOTE</bf>: By default, PTLib enables SNMP during the configuration
+process, so if SNMP doesn't work ensure that your PTLib <tt>wasn't</tt>
+compiled with <tt>--disable-snmp</tt>
+
+Using PTLib rather than the fully-featured Net-SNMP means that only traps
+and GET requests are supported.  See below for the additional switches
+which are required when using PTLib for SNMP.
+
+The <tt>Windows</tt> implementation integrates as a sub-agent into
+Windows' SNMP service. This implementation is incomplete.
+You can use the <tt>PTLib</tt> implementation on Windows, for the sam elimited SNMP support as on Unix.
+Please contact the authors if you need full SNMP support on Windows.
+
+<sect2>GNU Gatekeeper Enterprise MIB
+<p>
+The GNU Gatekeeper Project was assigned the enterprise number 27938
+by IANA (Internet Assigned Number Authority),
+so all of GnuGk's OIDs are under 1.3.6.1.4.1.27938.
+
+The formal MIB specification (SMIv2) can be found in the file 'gnugk.mib'
+that is distributed with GnuGk.
+You might want to import it into your SNMP management software to
+see symbolic names for GnuGk's OIDs.
+
+The following OIDs are available:
+<itemize>
+<item>1.3.6.1.4.1.27938.11.1.1 GnuGk version (GET)
+<item>1.3.6.1.4.1.27938.11.1.2 GnuGk version with module flags (GET)
+<item>1.3.6.1.4.1.27938.11.1.3 Current number of endpoint registrations (GET)
+<item>1.3.6.1.4.1.27938.11.1.4 Number of ongoing calls (GET)
+<item>1.3.6.1.4.1.27938.11.1.5 Trace level (GET, SET)
+<item>1.3.6.1.4.1.27938.11.1.6 CatchAll destination (GET, SET)
+<item>1.3.6.1.4.1.27938.11.1.7 Total calls since startup (GET)
+<item>1.3.6.1.4.1.27938.11.1.8 Successful calls since startup (GET)
+</itemize>
+All of these OIDs are scalars, so please remember to append '.0' when querying them eg. with 'snmpget'.
+
+Note: Setting the CatchAll destination via SNMP will update the config file
+to make the change permanent. Setting the trace level is a temporary setting.
+
+The following traps are defined:
+<itemize>
+<item>1 GnuGk started
+<item>2 GnuGk stopped
+<item>3 Config Reload
+<item>4 Module creation failed
+<item>5 Database operation failure
+<item>6 IO operation failure
+<item>7 General error
+<item>8 Authentication error
+<item>9 Message encoding/decoding error
+<item>10 Network error
+<item>11 Neighbor error
+</itemize>
+
+Traps may have 3 optional data elements:
+<itemize>
+<item>Severity level (OID 1.3.6.1.4.1.27938.11.2.1): Error=1, Warning=2, Info=3
+<item>Group (OID 1.3.6.1.4.1.27938.11.2.2): General=1, Network=2, Database=3, Accounting=4, Authentication=5, Configuration=6
+<item>Display string (OID 1.3.6.1.4.1.27938.11.2.3)
+</itemize>
+
+<sect2>Configuring Net-SNMP
+<p>
+Net-SNMP configuration is usually found in /etc/snmp/snmpd.conf.  This
+configuration file defines access control rules for the SNMP manager and
+where settings such as readonly and read-write community names are defined,
+where to send traps, etc.
+
+Depending on which trap host definition you use, Net-SNMP will convert the
+traps to the appropriate version.  Use 'trapsink' if you want to send version
+1 traps, 'trap2sink' if you want to send version 2 traps and
+'informsink' for SNMP v3 inform messages.
+
+Please make sure AgentX support is enabled in the Net-SNMP daemon.
+<p>
+<descrip>
+Simple example of a snmpd.conf for SNMP version 2c:
+<tscreen><verb>
+# server location and contact
+syslocation Server Room
+syscontact Sysadmin (root@example.com)
+
+# read-only access only from this network, access to all MIBs
+rocommunity public 192.168.1.0/24
+# read-write access only from this network, restricted to the GnuGk MIB
+rwcommunity mysecret 192.168.1.0/24	1.3.6.1.4.1.27938
+
+# send traps as version 2 to this host with community string 'public'
+trap2sink   192.168.1.64    public
+
+# enable AgentX support
+master agentx
+agentxsocket tcp:localhost:705
+</verb></tscreen>
+
+For SNMP version 3 the config file could look like this:
+<tscreen><verb>
+# server location and contact
+syslocation Server Room
+syscontact Sysadmin (root@example.com)
+
+# read-only access for user 'peter'
+rouser peter
+# full read-write access for user 'paul'
+rwuser paul
+# read-write access only for the GnuGk MIB for user 'mary'
+rwuser mary auth 1.3.6.1.4.1.27938
+
+# create the user accounts and set passwords
+createUser peter MD5 peterpeter DES
+createUser paul MD5 paulpaul DES
+createUser mary MD5 marymary DES
+
+# send traps as version 3 Inform messages with community string 'public'
+informsink   192.168.1.64    public
+
+# enable AgentX support
+master agentx
+agentxsocket tcp:localhost:705
+</verb></tscreen>
+</descrip>
+
+You can also configure the Net-SNMP based agent to run standalone without the Net-SNMP daemon, but this is not suggested.
+
+<itemize>
+<item><tt>Standalone=1</tt><newline>
+Default: <tt/0/<newline>
+Run SNMP-Agent standalone, and don't connect to AgentX master agent.
+</itemize>
+
+<p>
+<sect2>Using PTLib's SNMP implementation
+<p>
+PTlib supports SNMP version 1 and 2 GET requests and will always send version 1 traps in a version 2c message.
+GETNEXT (for 'walk') and SET requests are not supported.
+
+When using PTLib, you can use these additional switches:
+<itemize>
+<item><tt>TrapHost=192.168.1.100</tt><newline>
+Default: <tt/none/<newline>
+<p>
+Define the trap destination host. No traps will be sent if no host is defined. You may specify an IP or DNS name.
+
+<item><tt>TrapCommunity=public</tt><newline>
+Default: <tt/public/<newline>
+<p>
+Define the community string for traps.
+
+<item><tt>AgentListenIP=192.168.1.100</tt><newline>
+Default: <tt>127.0.0.1</tt><newline>
+<p>
+Define the IP the SNMP agent should listen on.
+
+<item><tt>AgentListenPort=11161</tt><newline>
+Default: <tt>161</tt><newline>
+<p>
+Define the UDP port the SNMP agent should listen on.
+
+<item><tt>AllowRequestsFrom=192.168.1.0/22</tt><newline>
+Default: <tt>n/a</tt><newline>
+<p>
+A comma separated list of IPs or networks which are allowed to send us SNMP requests.
+
+</itemize>

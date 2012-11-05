@@ -1,0 +1,829 @@
+<sect>Routed Mode and Proxy Configuration
+
+<sect1>Section &lsqb;RoutedMode&rsqb;
+<label id="routed">
+<p>
+Call signaling messages may be passed in two ways:
+The first method is Direct Endpoint Call Signaling, where 
+call signaling messages are passed directly between the endpoints.
+The second method is Gatekeeper Routed Call Signaling. With this method,
+the call signaling messages are routed through the gatekeeper.
+
+When Gatekeeper Routed call signaling is used, there are three different options for routing
+of the H.245 control channel and media channels.
+
+<descrip>
+<tag/Case I./
+The gatekeeper doesn't route them.
+The H.245 control channel and media channels are established directly
+between the endpoints.
+<tag/Case II./
+The H.245 control channel is routed through the gatekeeper, while the media channels
+are established directly between the endpoints.
+<tag/Case III./
+The gatekeeper routes the H.245 control channel,
+as well as all media channels, including RTP/RTCP for audio and video,
+and T.120 channel for data. In this case, no traffic is passed
+directly between the endpoints. This is usually called a H.323 Proxy,
+and can be treated as a H.323-H.323 gateway.
+</descrip>
+
+This section defines the gatekeeper routed mode options (case I &amp; II).
+The proxy feature is defined in the <ref id="proxy" name="next section">.
+
+The settings in this section may be updated by reloading the configuration while the gatekeeper is running.
+
+<itemize>
+<item><tt/GKRouted=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Enables gatekeeper routed signaling mode.
+
+<item><tt/H245Routed=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Enables routing of the H.245 control channel through the gatekeeper.
+This setting is honored if <tt/GKRouted=1/ and H.245 tunneling is disabled
+for a call. Even when this option is disabled, if Proxy or ProxyForNAT
+takes effect, a H.245 channel is always routed through the gatekeeper
+for calls being proxied.
+
+<item><tt/CallSignalPort=1720/<newline>
+Default: <tt/1721/<newline>
+<p>
+The port for call signaling on the gatekeeper.
+The default port is <tt/1721/. We don't use the well-known port <tt/1720/ by default
+so you can run an H.323 endpoint or gateway in the same machine as the gatekeeper.
+You may set it to <tt/0/ to let the gatekeeper choose an arbitrary port.
+
+<item><tt/CallSignalHandlerNumber=10/<newline>
+Default: <tt/5/<newline>
+<p>
+The number of threads dedicated to handle signaling/H.245 channels (between 1-200).
+You may increase this number in a heavy loaded gatekeeper. Each thread
+can process one signaling message at time, so increasing this number
+will increase call throughput. Under Windows, there exists a default limit
+of 64 sockets used by a single signaling thread, so each signaling thread
+is able to handle at most 32 calls (with H.245 tunneling enabled).
+
+<item><tt/RtpHandlerNumber=2/<newline>
+Default: <tt/1/<newline>
+<p>
+The number of RTP proxy handling threads. Increase this value only if you
+experience problems with RTP delay or jitter on a heavily loaded gatekeeper.
+Special care has to be taken on Windows, as RTP handling threads are subject
+to the same limit of 64 sockets as signaling threads. Each RTP thread is
+able to handle at most 32 proxied calls (2 sockets per call).
+
+<item><tt/AcceptNeighborsCalls=1/<newline>
+Default: <tt/1/<newline>
+<p>
+With this feature enabled, the call signaling thread will accept calls
+without a pre-existing CallRec found in the CallTable, provided an endpoint
+corresponding to the destinationAddress in Setup can be found in the
+RegistrationTable, and the calling party is a neighbor or parent gatekeeper.
+The gatekeeper will also use its own call signaling address in the LCF
+when responding to the LRQ. Call signaling will be routed
+to gatekeeper 2 in gatekeeper-to-gatekeeper calls.
+As a result, the CDRs in gatekeeper 2 will correctly show the connected
+time, instead of 'unconnected'.
+
+<item><tt/AcceptUnregisteredCalls=1/<newline>
+Default: <tt/0/<newline>
+<p>
+With this feature enabled, the gatekeeper will accept calls
+from any unregistered endpoint.
+Make sure you do proper authentication on these calls if you
+don't want to let everybody use your gatekeeper.
+When working with unregistered endpoints, you will probably also want
+to change the CallSignalPort to 1720.
+
+<item><tt/RemoveH245AddressOnTunneling=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Some endpoints send h245Address in the UUIE of Q.931 even when h245Tunneling
+is set to TRUE. This may cause interoperability problems. If the option
+is TRUE, the gatekeeper will remove h245Address when h245Tunneling flag
+is TRUE. This enforces the remote party to stay in tunneling mode.
+
+<item><tt/DisableH245Tunneling=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Force both sides of a call to disable H.245 tunneling.
+
+<item><tt/H245TunnelingTranslation=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Allow one side of a call to use H.245 tunneling even if the other side does
+not, with the gatekeeper performing the appropriate H.245 message
+conversion.  This will reduce the number of ports required on the tunneling
+side of the connection.
+
+
+<item><tt/RemoveCallOnDRQ=0/<newline>
+Default: <tt/1/<newline>
+<p>
+With this option disabled, the gatekeeper will not disconnect a call
+if it receives a DRQ for it. This avoids potential race conditions when
+a DRQ overtakes a Release Complete.
+This is only meaningful in routed mode because in direct mode, the only
+mechanism to signal end-of-call is a DRQ.
+When using call failover this must be set to 0.
+
+<item><tt/DropCallsByReleaseComplete=1/<newline>
+Default: <tt/0/<newline>
+<p>
+According to Recommendation H.323, the gatekeeper could tear down a call
+by sending RAS DisengageRequest to endpoints.
+However, some bad endpoints just ignore this command.
+With this option turning on, the gatekeeper will send Q.931
+Release Complete instead of RAS DRQ to both endpoints to force them
+drop the call.
+
+<item><tt/SendReleaseCompleteOnDRQ=1/<newline>
+Default: <tt/0/<newline>
+<p>
+On hangup, the endpoint sends both Release Complete within H.225/Q.931 and
+DRQ within RAS. It may happen that DRQ is processed first, causing the
+gatekeeper to close the call signaling channel, thus preventing the
+Release Complete from being forwarding to the other endpoint.
+Though the gatekeeper closes the TCP channel to the destination,
+some endpoints (e.g. Cisco CallManager) don't drop the call even if
+the call signaling channel is closed.
+This results in phones that keep ringing if the caller hangs up
+before the called number answers.
+Setting this parameter to <tt/1/ makes the gatekeeper always send
+Release Complete to both endpoints before closing the call when
+it receives a DRQ from one of the parties.
+
+<item><tt/SupportNATedEndpoints=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Whether to allow an endpoint behind a NAT box register to the gatekeeper.
+If yes, the gatekeeper will translate the IP address in Q.931 and H.245
+channel into the IP of NAT box.
+
+GnuGk supports NAT outbound calls (from an endpoint behind NAT
+to public networks) directly without any necessary modification
+of endpoints or NAT box. Just register the endpoint with GnuGk
+and you can make call now. 
+
+<item><tt/SupportCallingNATedEndpoints=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Whether to allow an endpoint behind an NAT box that support GnuGk NAT Traversal
+technique to receive calls. Use this to block errant gateways that do not support
+GnuGk Nat Traversal technique properly from causing one way audio problems when 
+trying to call to the gateway. Calls to the gateways return caller unreachable.
+To be effective SupportNATedEndpoints must be set to 1.
+
+<item><tt/TreatUnregisteredNAT=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Used in conjunction with AcceptUnregisteredCalls and SupportNATedEndpoints will
+automatically treat all unregistered calls which cannot be determined as
+being NAT are treated as being NAT. 
+
+Not all Endpoints send sourceSignalAddress in the setup message which can
+be used to determine whether a caller is NAT. This adds support to those that 
+don't.
+
+<item><tt/ScreenDisplayIE=MyID/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Modify the DisplayIE of Q.931 to the specified value.
+
+<item><tt/ScreenCallingPartyNumberIE=0965123456/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Modify the CallingPartyNumberIE of Q.931 to the specified value.
+
+<item><tt/ScreenSourceAddress=MyID/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Modify the sourceAddress field of UUIE element from Q.931 Setup message.
+
+<item><tt/ForwardOnFacility=1/<newline>
+Default: <tt/0/<newline>
+<p>
+If yes, on receiving Q.931 Facility with reason <bf/callForwarded/, <bf/routeCallToGatekeeper/ or <bf/routeCallToMC/,
+the gatekeeper will forwards call Setup directly to the forwarded endpoint,
+instead of passing the message back to the caller.
+If you have broken endpoints that can't handle Q.931 Facility with reason
+<bf/callForwarded/ (or the other reasons), turn on this option. Note that this feature
+may not always work correctly, as it does not provide any means
+of capability renegotiation and media channel reopening.
+The call is only forwarded if the forwarder is the called party and
+the H.245 channel is not established, yet.
+
+<item><tt/ShowForwarderNumber=0/<newline>
+Default: <tt/0/<newline>
+<p>
+Whether to rewrite the calling party number to the number of forwarder.
+It's usually used for billing purpose.
+Only valid if <tt/ForwardOnFacility=1/.
+
+<item><tt/Q931PortRange=20000-20999/<newline>
+Default: <tt>N/A (let the OS allocate ports)</tt><newline>
+<p>
+Specify the range of TCP port number for Q.931 signaling channels.
+Note the range size may limit the number of concurrent calls.
+Make sure this range is wide enough to take into account TIME_WAIT
+TCP socket timeout before a socket can be reused after closed.
+TIME_WAIT may vary from 15 seconds to a few minutes, depending on an OS.
+So if for example your range is 2000-2001 and you made two calls, the next two calls can be
+made after TIME_WAIT timeout elapses and the sockets can be reused.
+The same applies to <tt/H245PortRange/ and <tt/T120PortRange/. TIME_WAIT
+can be usually tuned down on most OSes.
+
+<item><tt/H245PortRange=30000-30999/<newline>
+Default: <tt>N/A (let the OS allocate ports)</tt><newline>
+<p>
+Specify the range of TCP port number for H.245 control channels.
+Note the range size may limit the number of concurrent calls.
+See remarks about TIME_WAIT socket state timeout in the <tt/Q931PortRange/
+description.
+
+<item><tt/SetupTimeout=4000/<newline>
+Default: <tt>8000</tt><newline>
+<p>
+A timeout value (in milliseconds) to wait for a first message (Setup)
+to be received after a signaling TCP channel has been opened.
+
+<item><tt/SignalTimeout=10000/<newline>
+Default: <tt>30000</tt><newline>
+<p>
+A timeout value (in milliseconds) to wait for a signaling channel
+to be opened after an ACF message is sent or to wait for an Alerting
+message after a signaling channel has been opened. This option
+can be thought as a maximum allowed PDD (Post Dial Delay) value.
+
+<item><tt/AlertingTimeout=60000/<newline>
+Default: <tt>180000</tt><newline>
+<p>
+A timeout value (in milliseconds) to wait for a Connect message
+after a call entered Alerting state. This option can be thought
+as a maximum "ringing time".
+
+<item><tt/TcpKeepAlive=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Enable/disable keepalive feature on TCP signaling sockets. This can
+help to detect inactive signaling channels and prevent dead calls from hanging
+in the call table. For this option to work, you also need to tweak system
+settings to adjust keep alive timeout. See docs/keepalive.txt for more details.
+If this switch is not present in the configuration, the socket is left untouched.
+
+<item><tt/TranslateFacility=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Enable this option if you have interoperability problems between H.323v4
+and non-H.323v4 endpoints. It converts Facility messages with reason = transportedInformation
+into Facility messages with an empty body, because some endpoints do not
+process tunneled H.245 messages inside Facility, if the body is not empty.
+The conversion is performed only when necessary - if both endpoints are v4
+or both endpoints are pre-v4, nothing is changed.
+
+<item><tt/SocketCleanupTimeout=1000/<newline>
+Default: <tt/5000/<newline>
+<p>
+Define time to wait before an unused socket is closed (if it is not yet closed)
+and deleted (its memory is released). If you use very small port ranges, like 
+a few ports (e.g. RTPPortRange=2000-2009), you may want to decrease this value
+to get sockets reusable faster.
+
+<item><tt/ActivateFailover=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Activate call failover: When activated, GnuGk will try to find
+other possible routes to a destination if the call fails on the
+first route. The list of routes for a call is built when the call
+first comes in and currently not all routing policies are able to
+provide multiple routes.
+You can use the 'internal' and the 'sql' policy to provide multiple routes.
+In addition to that multiple routes can be set by SQL and Radius authenticators.
+
+For accounting of calls using failover, see the SingleFailoverCDR
+switch in the <ref id="calltable" name="[CallTable]"> section.
+
+<item><tt/FailoverCauses=1-15,21-127/<newline>
+Default: <tt/1-15,21-127/<newline>
+<p>
+Define which cause codes in a ReleaseComplete will trigger
+call failover.
+
+<item><tt/DisableRetryChecks=1/<newline>
+Default: <tt/0/<newline>
+<p>
+This will disable all checks if a failed call has already received
+FastStart or H.245 messages. Caution: Using this switch enables you
+to retry more calls, but you run the risk that some of the retried
+calls will fail because the caller is already in a state where he
+can't talk to a new partner.
+
+<item><tt/CalledTypeOfNumber=1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Sets Called-Party-Number type of number to the specified value
+for all calls
+(0 - UnknownType, 1 - InternationalType, 2 - NationalType,
+3 - NetworkSpecificType, 4 - SubscriberType, 6 - AbbreviatedType, 7 - ReservedType).
+
+<item><tt/CallingTypeOfNumber=1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Sets Calling-Party-Number type of number to the specified value
+for all calls
+(0 - UnknownType, 1 - InternationalType, 2 - NationalType,
+3 - NetworkSpecificType, 4 - SubscriberType, 6 - AbbreviatedType, 7 - ReservedType).
+
+<item><tt/CalledPlanOfNumber=1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Sets Called-Numbering-Plan of number to the specified value
+(0 - UnknownType, 1 - ISDN, 3 - X.121 numbering, 4 - Telex, 8 - National standard, 9 - private numbering).
+
+<item><tt/CallingPlanOfNumber=1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Sets Calling-Numbering-Plan of number to the specified value
+(0 - UnknownType, 1 - ISDN, 3 - X.121 numbering, 4 - Telex, 8 - National standard, 9 - private numbering).
+
+<item><tt/ENUMservers=e164.org,e164.arpa/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Sets the enum server list in priority order separated by (,) for the enum policy. 
+This overrides the PWLIB_ENUM_PATH environmental variable.
+
+<item><tt/RDSservers=myvirtualhost.com/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Use this to specify a RDS server to query for rds routing policy. 
+This set the domains to use to resolve URI's which do not have SRV records and 
+may be virtually hosted or where SRV records are stored in another host.
+This overrides the PWLIB_RDS_PATH environmental variable.
+
+<item><tt/CpsLimit=10/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Limit the rate of incoming calls to n calls per second. If more calls are received they are
+rejected at the TCP level without H.323 error messages, so they won't show up in CDRs.
+A value of zero (default) disables the feature.
+<p>
+The limit only applies if the calls in the check interval are greater than check-interval * CPS-rate. This allows small call spikes on a machine without much load, but will apply strict limits when the overall load is high.
+<p>
+This feature is meant to shield the gatekeeper from overload and to avoid as much resource usage a possible in an overload situation.
+<p>
+Currently the calls are blocked when the first message comes in on the signaling port. This makes it
+very effective for unregistered calls. However, ARQs are not blocked, so it will be less effective with
+registered calls.
+
+<item><tt/CpsCheckInterval=1/<newline>
+Default: <tt>5</tt><newline>
+<p>
+Define the check interval in seconds before the CpsLimit is applied.
+
+<item><tt/GenerateCallProceeding=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+When set, GnuGk will generate a CallProceeding for each Setup message it receives.
+This can be helpful to avoid a timeout in calling endpoints if the destination takes
+a long time to answer or the call is processed in a virtual queue. Without setting
+UseProvisionalRespToH245Tunneling=1 this will disable H.245 tunneling.
+<p>
+CallProceeding messages sent by endpoints or gateways will be translated into Facility
+or Progress messages.
+
+<item><tt/UseProvisionalRespToH245Tunneling=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+WARNING: This is an experimental feature and not tested very well.
+<p>
+If you only use H.323 equipment that supports provisionalRespToH245Tunneling,
+you can set this switch to keep H.245 tunneling enabled when using gatekeeper
+generated CallProceeding.
+
+<item><tt/EnableH450.2=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+When set, GnuGk will intercept H.450.2 call transfer messages and if possible transfer 
+the call on behalf of the endpoint. This allows the endpoint initiated transferring of
+calls where the remote endpoint may not support H.450 and the gatekeeper initiates the 
+call transfer.  
+
+<item><tt/H4502EmulatorTransferMethod=Reroute/<newline>
+Default: <tt>callForwarded</tt><newline>
+<p>
+Set the call transfer method for the H.450.2 emulator.
+It defaults to sending a callFordwarded Facility to the endpoint.
+Setting it to "Reroute" uses a gatekeeper based TCS=0 transfer. ("Reroute" is still considered and experimental feature, that should be used with care.)
+
+<item><tt/TranslateReceivedQ931Cause=17:=34/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Translate all received cause codes in ReleaseComplete messages.
+In the above example code 17 (User busy) will be translated into cause code 34 (No circuit/channel available).
+
+<item><tt/TranslateSentQ931Cause=21:=34,27:=34/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Translate all cause codes in ReleaseComplete messages sent out.
+In the above example code 21 and 27 will be translated into cause code 34, because this particular gateway might deal with error code 34 better than with others.
+
+<item><tt/RemoveH235Call=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+For compatibility with endpoints which do not support large Setup messages
+or if endpoints send incorrect H.235 tokens,
+this switch removes all clearTokens and cryptoTokens from Setup and Connect messages.
+
+If you turn the feature on with setting the switch to 1, the H.235 tokens will be removed from all calls.
+You can also specify a list of networks, the only calls from these networks get the H.235 token removed,
+eg. RemoveH235Call=192.168.1.0/24, 10.0.1.0/32.
+
+<item><tt/RemoveH460Call=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+For compatibility with pre-H323v4 devices that do not support H.460,
+this switch strips the H.460 feature advertisements from the Setup PDU.
+Usually they should be ignored anyway; use this switch if they cause trouble.
+
+<item><tt/ForceNATKeepAlive=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Force ALL registrations to use a keepAlive TCP socket.
+
+<item><tt/EnableH46017=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Enable support for H.460.17. To enable H.460.19 for the media stream, you should also set EnableH46018=1.
+
+<item><tt/EnableH46026=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+EXPERIMENTAL: Enable support for H.460.26.
+
+<item><tt/EnableH46018=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Enable support for H.460.18 and H.460.19. This feature is covered by patents held by Tandberg.
+If you don't use the official releases by the GNU Gatekeeper Project, make sure you have a
+valid license before enabling it.
+
+<item><tt/H46018NoNat=0/<newline>
+Default: <tt>1</tt><newline>
+<p>
+Enable H.460.18 even if the endpoint is not behind a NAT. Setting to 0 will 
+disable H.460.18 if the endpoint is detected as not being behind a NAT. If H.460.23 is supported
+and enabled then direct media is still supported.
+
+<item><tt/EnableH46023=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Enable support for H.460.23/.24. You must also set STUN servers for H.460.23/.24 to become active.
+
+<item><tt/H46023STUN=stun.ekiga.net,192.168.1.10/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Sets the STUN server list for use with H.460.23 separated by (,). 
+Each Network interface must have a STUNserver set for H.460.23 support on that interface.
+
+<item><tt/H46023PublicIP=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Newer endpoints on public IP addresses can receive calls from endpoints behind NAT. This feature when
+enabled will presume all endpoints that are not NAT can receive calls from endpoints behind NAT for the 
+purpose of H.460.24 media pathway calculations so to avoid proxying of media. This maybe used in conjunction
+with AlwaysRewriteSourceCallSignalAddress=0 to trick the remote endpoint to think that the call is coming direct
+from behind NAT and not routed via the gatekeeper.
+
+<item><tt/H46023SignalGKRouted=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Force all call signaling for NAT to be GK routed. There are a number of conditions where call signaling may be 
+offloaded when using H.460.23/.24 This switch will force all the signaling to be Gatekeeper routed.
+
+<item><tt/H46024ForceDirect=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Force all media to NOT proxy if the remote NAT status cannot be determined. Most (not all) H.323 devices are
+able if on a public IP to receive calls from endpoints that are behind NAT. Use this switch with caution.
+
+<item><tt/NATStdMin=18/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Require registering endpoints detected as being behind a NAT to support a Standard NAT Traversal mechanism.
+When an endpoint registers from behind a NAT and does not support the minimum NAT standard then the registration
+will be rejected with a reason neededFeatureNotSupported.
+Valid values are "18" for H.460.18/.19 and "23" for H.460.23/.24
+
+<item><tt/TranslateSorensonSourceInfo=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Translate the non-standard caller information eg. from a Sorenson VP200 into sourceAddress and CallingPartyIE.
+
+<item><tt/RemoveSorensonSourceInfo=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Remove the non-standard caller information eg. from a Sorenson VP200 after translation.
+
+<item><tt/RemoveFaxUDPOptionsFromRM=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+An Avaya Communication Manager 3.1 system equipped with TN2602AP media
+processors becomes confused when it receives t38FaxUdpOptions in
+t38FaxProfile of H.245 RequestMode.  AddPac VoiceFinder is an example of an
+application which does this.  At that point, the TN2602AP will begin to send
+larger T.38 packets than the receiver can process, resulting in facsimile
+document distortion.  This switch will remove t38FaxUdpOptions from
+RequestMode, making the combination of Avaya Communication Manager 3.1
+equipped and TN2602AP media processors compatible with endpoints which send
+t38FaxUdpOptions in RM.
+
+<item><tt/AlwaysRewriteSourceCallSignalAddress=0/<newline>
+Default: <tt>1</tt><newline>
+<p>
+When set to false or 0, GnuGk will not rewrite the sourceCallSignalAddress to its own IP in
+routed mode. This helps some endpoints to get through NATs.
+In proxy mode, the IP is always rewritten to GnuGk's IP, regardless of this switch.
+
+<item><tt/AutoProxyIPv4ToIPv6Calls=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Automatically put calls between different IP versions into full proxy mode.
+Note that this auto detection only looks at the call signal addresses to make the decision.
+It is possible that one endpoint decides to use H.245 or media IPs with a different IP version
+later on and the call will fail if the receiving endpoint isn't capable of handling multiple
+IP versions.
+
+<item><tt/EnableH235HalfCallMedia=1/<newline>
+Default: <tt/0/<newline>
+<p>
+When the endpoint on one side of a call supports encryption and the endpoint
+on the other side does not, the gatekeeper will act as a "man-in-the-middle"
+and encrypt the media stream to the encryption-capable system.  A decrypted
+media stream will be sent to the endpoint which is otherwise unable to
+encrypt / decrypt traffic because of licensing issues, lack of encryption
+chip support in the hardware, obsolescence, etc.  This may be useful if the
+system you are trying to reach is on the Internet; your internal traffic can
+remain unencrypted, but your external traffic will be secure.
+
+Enabling this feature will force call signaling for all calls to
+routed-mode, and will set it to proxy-mode for encrypted calls.
+
+When not using RTP multiplexing, the caller and called endpoint must be on
+different IPs and may not be behind the same NAT. The endpoints also must send
+RTP from the same IP as their signalling messages.
+
+As of Version 3.x of GnuGk, encryption of data channels is not supported.
+
+<item><tt/RequireH235HalfCallMedia=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Require at least one leg of the call to be encrypted.
+(Terminate the call if both legs are unencrypted.)
+
+<item><tt/H235HalfCallMediaStrength=256/<newline>
+Default: <tt/128/<newline>
+<p>
+Set the maximum cypher length to support for H.235 half call media.
+
+<item><tt/Q931DecodingError=Drop/<newline>
+Default: <tt/Disconnect/<newline>
+<p>
+Specify GnuGk's reaction to invalid Q.931 messages that it cannot decode.
+Until version 3.1 GnuGk would "Disconnect" the connection to protect internal endpoints
+from possibly malicious messages, but if you have some buggy endpoints that you can't get
+fixed, it might be helpful just to "Drop" this Q.931 message that couldn't be decoded.
+The last option to simply "Forward" the messages should be used with great care, since
+invalid messages might cause your endpoints to crash or worse.
+
+<item><tt/EnableH460P=1/<newline>
+Default: <tt/0/<newline>
+<p>
+WARNING: This is an experimental feature to support the not-yet-released H.460 presence standard.
+
+
+</itemize>
+
+<p>
+<sect1>Section &lsqb;Proxy&rsqb;
+<label id="proxy">
+<p>
+The section defines the H.323 proxy features. It means the gatekeeper will
+route all the traffic between the calling and called endpoints, so there
+is no traffic between the two endpoints directly. Thus it is very useful
+if you have some endpoints using private IP behind an NAT box and some
+endpoints using public IP outside the box.
+
+The gatekeeper can do proxy for logical channels of RTP/RTCP (audio and video)
+and T.120 (data). Logical channels opened by fast-connect procedures
+or H.245 tunneling are also supported.
+
+Note to make proxy work, the gatekeeper must have <bf/direct connection/
+to both networks of the caller and callee.
+
+<itemize>
+<item><tt/Enable=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Whether to enable the proxy function. You have to enable gatekeeper
+routed mode first (see the <ref id="routed" name="previous section">).
+You don't have to specify H.245 routed.
+It will automatically be used if required.
+
+<item><tt>InternalNetwork=10.0.1.0/24</tt><newline>
+Default: <tt>N/A</tt><newline>
+<p>
+If you want to override automatic detection of networks behind the proxy, you may do so by specifying them here.
+Multiple internal networks are allowed.
+Packets to internal networks will use the local interface as sender instead of the default IP or ExternalIP.
+For internal networks, the proxying can be disabled, even when global proxying is activated.
+
+<descrip>
+<tag/Format:/
+<tt>InternalNetwork=network address/netmask[,network address/netmask,...]</tt>
+<p>
+The netmask can be expressed in decimal dot notation or
+CIDR notation (prefix length), as shown in the example.
+<tag/Example:/
+<tt>InternalNetwork=10.0.0.0/255.0.0.0,192.168.0.0/24</tt>
+</descrip>
+
+<item><tt/ProxyAlways=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Always proxy all calls regardless of other settings.
+
+<item><tt/T120PortRange=40000-40999/<newline>
+Default: <tt>N/A (let the OS allocate ports)</tt><newline>
+<p>
+Specify the range of TCP port number for T.120 data channels.
+Note the range size may limit the number of concurrent calls.
+See remarks about TIME_WAIT socket state timeout in the <tt/Q931PortRange/
+description.
+
+<item><tt/RTPPortRange=50000-59999/<newline>
+Default: <tt>1024-65535</tt><newline>
+<p>
+Specify the range of UDP port number for RTP/RTCP channels. Since RTP streams require two sockets, the range must contain an even number of ports.
+Note that the size of the specified range may limit the number of possible concurrent calls.
+
+<item><tt/ProxyForNAT=1/<newline>
+Default: <tt/1/<newline>
+<p>
+If set, the gatekeeper will function as a proxy for calls where one of the participating endpoints
+is behind a NAT box. This ensures the RTP/RTCP stream can
+penetrate into the NAT box without modifying it.
+However, the endpoint behind the NAT box must use the same port
+to send and receive RTP/RTCP stream.
+If you have bad or broken endpoints that don't satisfy the precondition,
+you should disable this feature and let the NAT box forward
+RTP/RTCP stream for you.
+
+<item><tt/ProxyForSameNAT=1/<newline>
+Default: <tt/1/<newline>
+<p>
+Whether to proxy for calls between endpoints from the same NAT box.
+There is a degree of uncertainty when endpoints are behind the same NAT as to 
+whether they can communicate directly as one or both may be on subNATs. Disable
+this feature with caution.
+
+<item><tt/RemoveH235Call=1/<newline>
+Default: <tt/0/<newline>
+<p>
+This setting removes the cryptoTokens and clearTokens from the Setup message.
+Use this when working with IP phones that do not support large Setup messages.
+
+<item><tt/RemoveH460Call=1/<newline>
+Default: <tt/0/<newline>
+<p>
+This setting removes the H.460 features from the Setup message. Use this with
+pre-H.323v4 endpoints and gateways which cannot decode these messages.
+
+<item><tt/DisableRTPQueueing=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Sometimes GnuGk will receive RTP data before it knows where to forward it to.
+GnuGk can buffer this data up to a certain amount and send it once
+the destination becomes available. In some cases this can cause a short loopback
+of RTP data.
+
+<item><tt/EnableRTPMute=1/<newline>
+Default: <tt/0/<newline>
+<p>
+This setting allows either call party in media proxy mode to mute the 
+audio/video by sending a * as either string or tone.userinput. The sending 
+of * mutes the audio/video and a subsequent send of * unmutes the 
+audio/video. Only the party who muted the call can unmute. This is designed 
+as a hold function for terminals which do not support H450.4.
+
+<item><tt/EnableRTCPStats=1/<newline>
+Default: <tt/0/<newline>
+<p>
+When enabled, GnuGk will collect RTCP sender reports and send them to the Radius server.
+
+<item><tt/RemoveMCInFastStartTransmitOffer=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Remove the mediaChannel from fastStart transmit offers.
+For unicast transmit channels, mediaChannel should not be sent on offer;
+it is the responsibility of the callee to provide mediaChannel in an answer.
+
+<item><tt/SearchBothSidesOnCLC=1/<newline>
+Default: <tt/0/<newline>
+<p>
+The H.245 CloseLogicalChannel request should only reference the
+endpoint's own logical channels.
+Some bad endpoint implementations require searching and closing
+logical channels for the other endpoint as well.
+Up to version 2.3.0 GnuGk did this automatically, but it can break
+channel establishment in some cases, so you must enable this
+switch if you have these broken endpoints.
+
+
+<item><tt/RTPMultiplexing=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Enable H.460.19 RTP multiplexing.
+<p>
+NOTE: To change RTP multiplexing settings, including ports, you must restart GnuGk.
+A configuration reload will not re-read this configuration item.
+
+<item><tt/RTPMultiplexPort=4000/<newline>
+Default: <tt/3000/<newline>
+<p>
+Set the RTP port for H.460.19 RTP multiplexing.
+
+<item><tt/RTCPMultiplexPort=4001/<newline>
+Default: <tt/3001/<newline>
+<p>
+Set the RTCP port for H.460.19 RTP multiplexing.
+
+<item><tt>ExplicitRoutes=10.2.1.5/16,10.6.1.3/16,11.0.0.0/8-20.1.1.1</tt><newline>
+Default: <tt>n/a</tt><newline>
+<p>
+Add explicit routing rules to GnuGk's internal routing table.
+Rules can have 2 formats: <tt>sourceIP/mask</tt> or <tt>network/mask-sourceIP</tt>.
+The above example would use 10.2.1.5 as sender IP for all messages
+to the 10.2.0.0/16 network and 10.6.1.3 for messages to the 10.6.0.0/16 network.
+Messages to the 11.0.0.0/8 network get 20.1.1.1 as sender IP.
+All sender IPs should be included in the list of Home IPs.
+
+</itemize>
+
+<p>
+<sect1>Section &lsqb;ModeSelection&rsqb;
+<label id="modeselection">
+<p>
+In routed mode or proxy mode, you may use this section to specify the exact routing mode
+(routed mode, routed mode plus H.245 routing or proxy mode) on a per-IP network basis.
+
+<descrip>
+<tag/Syntax:/
+
+<tt/network=mode[,mode]/
+</descrip>
+
+The network is specified by an IP plus optional CIDR, eg. 192.168.1.0/24.
+The rule for the network with the longest netmask is used (the most specific).
+<p>
+
+Possible modes are (the names are case in-sensitive)
+<itemize>
+<item><tt/ROUTED/<newline>
+Routed mode where Q.931 messages are routed, but not H.245 messages (unless H.245 tunneling is active).
+<item><tt/H245ROUTED/<newline>
+Routed mode plus H.245 routing.
+<item><tt/PROXY/<newline>
+Proxy mode with RTP proxying.
+</itemize>
+
+The first mode is used for calls into and out of the specified network.
+The second mode is used for calls that stay inside the network.
+If only one mode is specified it is used for both cases.
+
+<descrip>
+<tag/Example:/
+
+In this example calls into and out of the 1.2.3.0/24 network are proxied, but calls that remain inside this network are in routed mode. Calls in the 3.4.5.0/24 are always proxied, even when they remain inside the network, unless IP 3.4.5.6 is involved. If 2 networks have a rule for the call, the one with the most proxying is used, eg. a call from 192.168.1.222 to 3.4.5.20 would be proxied.
+
+<tscreen><verb>
+[ModeSelection]
+127.0.0.0/24=ROUTED
+192.168.0.0/18=H245ROUTED,ROUTED
+1.2.3.0/24=PROXY,ROUTED
+3.4.5.0/24=PROXY,PROXY
+3.4.5.6=ROUTED
+2005:4dd0:ff00:99a::9/64=PROXY
+</verb></tscreen>
+
+</descrip>
+
+If no rules match the settings then [RoutedMode]GkRouted=, H245Routed= or [Proxy]Enable= are used to determine the routing mode.
+<p>
+There are a few cases where these rules don't apply, because
+<htmlurl url="http://www.gnugk.org/" name="the GNU Gatekeeper">
+knows that the call needs proxying:
+For example calls involving H.460.18/.19 will always be proxied (because this protocol requires proxying).
+
