@@ -1,0 +1,162 @@
+<sect>Per-Endpoint Configuration
+<label id="epconfig">
+<p>
+In addition to the standard configuration file options, per-endpoint configuration
+settings can be specified in the <htmlurl url="http://www.gnugk.org/" name="GnuGk"> config file.
+The syntax is as follows:
+
+<sect1>Section &lsqb;EP::...&rsqb;
+<p>
+<tscreen><verb>
+[EP::ALIAS]
+Key Name=Value String
+</verb></tscreen>
+
+<tt/ALIAS/ should be replaced with the actual alias for the endpoint the settings
+should apply to. If your endpoint has multiple aliases, you can pick one of them.
+GnuGk will look through all aliases and use the first [EP:..] section it finds.
+
+Currently, the following options are recognized:
+
+<itemize>
+<item><tt/Capacity=10/<newline>
+Default: <tt/-1/<newline>
+<p>
+Call capacity for an endpoint. No more than <tt/Capacity/ concurrent
+calls will be sent to this endpoint. In case of gateways, if more than one
+gateway matches a dialed number, a call will be sent to the first available
+gateway which has available capacity.
+
+<item><tt/PrefixCapacities=^0049:=10,^(0044|0045):=20/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Limit the capacity for certain prefixes. Regular expressions can be used to specify
+the prefix and specify a combined capacity for a group of prefixes. For a gateway to
+be considered available a.) the prefix must have capacity left and b.) the total gateway
+capacity (see above) must not be exceeded.
+
+<item><tt/GatewayPriority=1/<newline>
+Default: <tt/1/<newline>
+<p>
+Applicable only to gateways. Allows priority based routing when more
+than one gateway matches a dialed number. Lower values indicate a higher gateway priority.
+A call is routed to the first available gateway
+(that has available capacity) with the highest priority (the lowest
+<tt/GatewayPriority/ values). In case the gateway priority contradicts prefix priority (see section <ref id="gwprefixes" name="[RasSrv::GWPrefixes]">)  
+ for details), prefix priority will take precedence.
+
+<item><tt/GatewayPrefixes=0048,0049:=2,0044/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Additional prefixes for this gateway. Applies only to gateways.  Special
+characters <tt/./ and <tt/!/ can be used to match any digit or to disable
+the prefix.  You may use the := syntax to set a prefix priority in the same
+manner as in <ref id="gwprefixes" name="[RasSrv::GWPrefixes]"> section.  If
+no priority is explicitly configured for a prefix, then the gateway priority
+is used.
+
+<item><tt/AddNumbers=4212,5650-5630,6000/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Add E.164 numbers to this endpoint. The new aliases can either be specified
+as a list of numbers or as number ranges.
+
+<item><tt/CalledTypeOfNumber=1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Sets Called-Party-Number type of number to the specified value
+for calls sent to this endpoint
+(0 - UnknownType, 1 - InternationalType, 2 - NationalType,
+3 - NetworkSpecificType, 4 - SubscriberType, 6 - AbbreviatedType, 7 - ReservedType).
+
+<item><tt/CallingTypeOfNumber=1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Sets Calling-Party-Number type of number to the specified value
+for calls sent to this endpoint
+(0 - UnknownType, 1 - InternationalType, 2 - NationalType,
+3 - NetworkSpecificType, 4 - SubscriberType, 6 - AbbreviatedType, 7 - ReservedType).
+
+<item><tt/CalledPlanOfNumber=1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Sets Called-Numbering-Plan of number to the specified value
+for calls sent to this endpoint
+(0 - UnknownType, 1 - ISDN, 3 - X.121 numbering, 4 - Telex, 8 - National standard, 9 - private numbering).
+
+<item><tt/CallingPlanOfNumber=1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Sets Calling-Numbering-Plan of number to the specified value
+for calls sent to this endpoint
+(0 - UnknownType, 1 - ISDN, 3 - X.121 numbering, 4 - Telex, 8 - National standard, 9 - private numbering).
+
+<item><tt/Proxy=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Enables/disables proxying calls sent to this endpoint (0 - do not
+change global proxy settings, 1 - force proxy mode, 2 - disable proxy mode).
+
+<item><tt/TranslateReceivedQ931Cause=17:=34/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Translate received cause codes in ReleaseComplete messages from this endpoint.
+In the above example code 17 (User busy) will be translated into cause code 34 (No circuit/channel available).
+
+<item><tt/TranslateSentQ931Cause=21:=34,27:=34/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Translate cause codes in ReleaseComplete messages sent out to this endpoint.
+In the above example code 21 and 27 will be translated into cause code 34, because this particular gateway might deal with error code 34 better than with others.
+
+<item><tt/DisableH46018=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Disable H.460.18/.19 for this endpoint.
+
+<item><tt/MaxBandwidth=81920/<newline>
+Default: <tt>-1</tt><newline>
+<p>
+Maximum bandwidth this endpoint may use in units of 100 bits per second.
+
+This includes inbound and outbound bandwidth, so for symmetrical calls this
+should be doubled.
+
+Common bandwidth settings and their GnuGk equivalents:<newline>
+384K  =  7680<newline>
+512K  =  10240<newline>
+768K  =  15360<newline>
+1024K =  20480<newline>
+1920K =  38400<newline>
+2048K =  40960<newline>
+4096K =  81920<newline>
+
+If you do not wish to restrict bandwidth, then use "-1".
+
+<item><tt/AdditionalDestinationAlias=H323-TRUNK/<newline>
+Default: <tt>n/a</tt><newline>
+<p>
+Add an additional alias to all calls going to this endpoint, if its not already present.
+This can be used to add the trunk ID required by Swxy version 6 and up.
+
+</itemize>
+
+Example how to attach an [EP::..] section to an endpoint:
+
+<tscreen><verb>
+[RasSrv::PermanentEndpoints]
+192.168.1.1=gw1;48
+192.168.1.2=gw2;48,!4850,!4860,!4869,!4888
+
+[EP::gw1]
+Capacity=60
+GatewayPriority=1
+
+[EP::gw2]
+Capacity=30
+GatewayPriority=2
+</verb></tscreen>
+
+In this example, calls will be sent to the gateway <tt/gw1/ until its
+capacity is fully utilized (60 concurrent calls) and then to the gateway <tt/gw2/.
+

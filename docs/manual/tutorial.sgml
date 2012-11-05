@@ -1,0 +1,350 @@
+<sect>Getting Started (Tutorial)
+<p>
+<sect1>A simple first attempt
+<p>
+To confirm that all components are up and running, we will use
+two Linux workstations, both connected to the same LAN.
+In the examples, the H.323 client is a softphone called "SimpH323"
+which comes as a sample application with H323Plus in the samples/simple/ folder.
+
+On the first server start the <htmlurl url="http://www.gnugk.org/" name="gatekeeper">
+in direct mode:
+
+<tscreen><verb>
+jan@server1> gnugk -ttt
+</verb></tscreen>
+
+The "<tt/-ttt/" option tells the gatekeeper that it should be verbose and
+print extra debug output to the console.  You can direct the output to a
+file with "<tt/-o logfilename.log/"
+
+Now, start SimpH323 on another console on the same system:
+<tscreen><verb>
+jan@server1> simph323 -l -a -u jan
+</verb></tscreen>
+
+SimpH323 is now listening (<tt/-l/) for calls and will automatically accept
+them (<tt/-a/).  It has also registered with the gatekeeper as user "jan"
+thereby allowing the gatekeeper to creating an association between the user
+"jan" and their IP address.  
+
+SimpH323 will attempt to automatically locate the gatekeeper, but if the auto
+detection fails, use "<tt/-g 1.2.3.4/" to specify the IP address.
+
+On the second client run simph323 this way:
+
+<tscreen><verb>
+peter@client2> simph323 -u peter jan
+</verb></tscreen>
+
+This instance of SimpH323 registers with the auto-detected gatekeeper as user
+"peter" and tries to call user "jan".  The gatekeeper will accept the
+request from "peter" and will determine if it can locate the IP address of a
+user name "jan".  
+
+Because "jan" has already registered with the gatekeeper, it will send
+"jan"s IP address to "peter".  "peter"s SimpH323 will then use that IP
+address to setup a direct session to "jan"s SimpH323 running on server1.
+
+The instance of SimpH323 on server1 will automatically accept the call and Peter and Jan can chat.
+
+<sect1>Using the Status interface to monitor the gatekeeper
+<p>
+The status interface presents a text-based means of interacting with an already-running gatekeeper.
+
+On a new console we use telnet to connect to the gatekeeper:
+
+<tscreen><verb>
+jan@server1> telnet localhost 7000
+</verb></tscreen>
+
+You should receive an "Access forbidden!" message because by default, access to the status port is restricted.
+
+Create a file called <tt/gatekeeper.ini/ in the
+directory where we start the gatekeeper.
+<tt/gatekeeper.ini/ will contain the following three lines:
+
+<tscreen><verb>
+[Gatekeeper::Main]
+[GkStatus::Auth]
+rule=allow
+</verb></tscreen>
+
+Stop the gatekeeper with Ctrl-C and restart it, but specify that it should use the <tt/gatekeeper.ini/ we just created:
+
+<tscreen><verb>
+jan@server1> gnugk -ttt -c ./gatekeeper.ini
+</verb></tscreen>
+
+Use telnet to connect to port 7000 and you should now be allowed to connect to the gatekeeper:
+
+<tscreen><verb>
+jan@server1>  telnet localhost 7000
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+Version:
+Gatekeeper(GNU) Version(2.3.5) Ext(pthreads=1,radius=1,mysql=0,pgsql=0,firebird=0,odbc=0,sqlite=0,
+large_fdset=0,crypto/ssl=0,h46018=1,h46023=1,ldap=0,ssh=0) H323Plus(1.22.2) PTLib(2.8.5)
+Build(Jul 31 2011, 09:03:11) Sys(Linux x86_64 2.6.32-33-generic)
+Startup: Sun, 31 Jul 2011 08:07:36 -0600   Running: 102 days 01:08:15
+;
+</verb></tscreen>
+
+Now repeat the first experiment where Peter calls Jan and see which
+messages are handled by the gatekeeper in non-routed mode.
+
+There are a number of commands that can be issued in the telnet session - type "help" to see them.
+
+To end the telnet session with the gatekeeper type "quit" and hit Enter.
+
+The example configuration file we created is very insecure because it has a default <bf/allow/ rule, so there are no
+restrictions on who can connect to the status port and which commands they may execute.
+
+Change the configuration file to:
+
+<tscreen><verb>
+[Gatekeeper::Main]
+[GkStatus::Auth]
+rule=password
+gkadmin=QC7VyAo5jEw=
+</verb></tscreen>
+
+The fourth line was added by the addpasswd utility, which was used to create a user "gkadmin" with 
+password "secret".  This change now enforces authentication to the status port.
+
+Restart the gatekeeper with this new configuration and perform the telnet again.
+You should now be prompted for a username and password:
+
+<tscreen><verb>
+jan@server1>  telnet localhost 7000
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+
+GnuGk login: gkadmin
+Password: secret
+Version:
+Gatekeeper(GNU) Version(2.3.5) Ext(pthreads=1,radius=1,mysql=0,pgsql=0,firebird=0,odbc=0,sqlite=0,
+large_fdset=0,crypto/ssl=0,h46018=1,h46023=1,ldap=0,ssh=0) H323Plus(1.22.2) PTLib(2.8.5)
+Build(Jul 31 2011, 09:03:11) Sys(Linux x86_64 2.6.32-33-generic)
+Startup: Sun, 31 Jul 2011 08:07:36 -0600   Running: 102 days 01:10:15
+;
+</verb></tscreen>
+
+The <ref id="gkstatusauth" name="[GkStatus::Auth]"> section contains additional information on securing the status port.
+
+<sect1>Running the gatekeeper in routed mode
+<p>
+Starting the gatekeeper in routed mode means that the gatekeeper
+uses "gatekeeper routed signaling". 
+All signaling messages go through the gatekeeper, giving it
+much greater control over the calls.
+
+Start GnuGk like this:
+<tscreen><verb>
+jan@server2> gnugk -r
+</verb></tscreen>
+
+will put the gatekeeper in routed mode. Telnet to the status port
+and make a call to see what messages are now handled by the gatekeeper.
+
+Note that all media packets (audio and video) are still sent
+directly between the endpoints (the 2 instances of SimpH323).
+
+<sect1>A virtual PBX: Disconnecting calls
+<p>
+Until now the gatekeeper has acted only as a mechanism
+to resolve symbolic names to IP addresses. This is a critical function of
+a gatekeeper, but the gatekeeper is capable of much more.
+
+Because the gatekeeper has a lot of control over the calls,
+it can also be used to terminate them. While
+connected to the status port, you can list all active calls
+with "<tt/PrintCurrentCalls/". To terminate a call, type
+"<tt/Disconnectip 1.2.3.4/" for one of the endpoints.
+
+For example, a simple script could be written to connect to
+the status port, obtain a list of ongoing calls and terminate
+them after 5 minutes to prevent users from using too many system resources.
+
+Other functions such as TransferCall are also available.
+
+<sect1>Routing calls to a gateway to reach external users
+<p>
+Without using a gateway you can only call other people with an
+IP phone over the Internet. To reach people with ordinary telephones
+you must use a gateway.
+
+<tscreen><verb>
+_________________          ______________
+| endpoint "jan"|          |            |
+| 192.168.88.35 |--------->| Gatekeeper |
+|_______________|          |            |
+_________________          |            |
+| gateway "gw1" | outgoing |            |
+| 192.168.88.37 |<---------|____________|
+|_______________|
+</verb></tscreen>
+
+The gatekeeper must be configured to specify which calls should be routed
+to the gateway and which numbers can be called directly.
+Use the [RasSrv::GWPrefixes] section of the config file to tell
+the gatekeeper the prefix of numbers that should be routed to the
+gateway.
+
+<tscreen><verb>
+[RasSrv::GWPrefixes]
+gw1=0
+</verb></tscreen>
+
+This entry tells the gatekeeper to route all calls to E.164 numbers
+starting with "0" to the gateway that has registered with the H.323
+alias "gw1". If there is no registered gateway with that alias the
+call will fail. 
+
+<bf>NOTE:</bf> You must use the gateway alias - you cannot use the IP address of the gateway.
+
+A prefix can contain digits <tt/0-9/, <tt/#/ and <tt/*/. It can also
+contain a special character <tt/./ (a dot) that matches any digit
+and can be prefixed with <tt/!/ (an exclamation mark) to disable the prefix.
+Prefix matching is done according to the longest matching prefix rule,
+with ! rules having higher priority if lengths are equal. You may also 
+use := syntax to set the priority between several gateways matching the same prefix (see section <ref id="gwprefixes" name="[RasSrv::GWPrefixes]"> for details). 
+Some examples:
+
+<tscreen><verb>
+[RasSrv::GWPrefixes]
+; This entry will route numbers starting with 0048 (but not with 004850 and 004860)
+; to gw1
+gw1=0048,!004850,!004860
+; This entry will match only 001 with 10 digits following and route the call to
+; gw2
+gw2=001..........
+</verb></tscreen>
+
+
+<sect1>Rewriting E.164 numbers
+<p>
+When using a gateway you often have to use different numbers internally
+and rewrite them before sending them over a gateway into the telephone
+network. You can use the <ref id="rewrite" name="[RasSrv::RewriteE164]">
+section to configure that.
+
+Example:
+You want to call number 12345 with your IP Phone and would like to
+reach number 08765 behind a gateway called "gw1".
+
+<tscreen><verb>
+[RasSrv::GWPrefixes]
+gw1=0
+
+[RasSrv::RewriteE164]
+12345=08765
+</verb></tscreen>
+
+You can also configure rewriting of E.164 numbers based on which gateway
+you are receiving a call from or sending a call to using the
+<ref id="gwrewrite" name="[RasSrv::GWRewriteE164]"> section.
+
+Example:
+You have two different gateways ("gw1" and "gw2") which you are sending
+calls with prefix 0044 to, but which require a different prefix to be
+added to the number after the routing has selected the gateway. This
+might be for identification purposes for example.
+
+<tscreen><verb>
+[RasSrv::GWPrefixes]
+gw1=0044
+gw2=0044
+
+[RasSrv::GWRewriteE164]
+gw1=out=0044=77770044
+gw2=out=0044=88880044
+</verb></tscreen>
+
+Example:
+You want to identify calls from a particular gateway "gw1" with a specific
+prefix before passing these calls to another gateway "gw2".
+
+<tscreen><verb>
+[RasSrv::GWPrefixes]
+gw2=1
+
+[RasSrv::GWRewriteE164]
+gw1=in=00=123400
+</verb></tscreen>
+
+Rewrite expressions accept dot <tt/'.'/ and percent sign <tt/'%'/ wildcard
+characters to allow building more general rules. The dot character can occur
+on both the left and right hand sides of expressions. The percent sign can occur
+only at the left side. Use <tt/'.'/ to match any character and copy it
+to the rewritten string and <tt/'%'/ to match any character and skip it.
+A few simple examples:
+
+<tscreen><verb>
+[RasSrv::RewriteE164]
+; Rewrite 0044 + min. 7 digits to 44 + min. 7 digits
+0044.......=44.......
+; Rewrite numbers starting with 11 + 4 digits + 11  to 22 + 4 digits + 22
+; (like 11333311 => 22333322, 110000112345 => 220000222345)
+11....11=22....22
+; strip the first four digits from all numbers (11114858345 => 4858345)
+; this is equivalent of 10 rules %%%%1=1, %%%%2=2, ... 
+%%%%.=.
+; insert two zeros in the middle of the number (111148581234 => 11110048581234)
+....48=....0048
+; even this is possible (415161 => 041051061)
+4.5.6=04.05.06
+</verb></tscreen>
+
+<sect1>Using IPv6
+<p>
+To use IPv6 with GnuGk, you must enable it in the config file:
+
+<tscreen><verb>
+[Gatekeeper::Main]
+EnableIPv6=1
+</verb></tscreen>
+
+Calls between IPv4 and IPv6 endpoints are automatically put into proxy-mode
+to allow GnuGk to perform address translation.
+If your endpoints can automatically handle mixed
+IPv4-IPv6 calls the auto-proxying can be disabled using the
+<tt/AutoProxyIPv4ToIPv6Calls/ switch in the [RoutedMode] section.
+As of 2011-11-10 there don't appear to be any endpoints which can do this.
+
+To support IPv4 and IPv6 endpoints at the same time, GnuGk relies
+on the operating system to manage IPv4 mapped IPv6 addresses.
+With a few exception, most current operating systems support this.
+
+Operating System Overview:
+<itemize>
+<item><bf/Linux/ OK
+<item><bf/Windows 7/ OK
+<item><bf/Windows Server 2008/ OK
+<item><bf/Windows Vista/ OK
+<item><bf/Windows XP/ either IPv4 or IPv6
+<item><bf/FreeBSD/ OK
+<item><bf/NetBSD/ OK
+<item><bf/OpenBSD/ either IPv4 or IPv6
+<item><bf/Solaris/ OK
+</itemize>
+
+For Windows, you need at least Windows Vista, Windows Server 2008, Windows 7 or newer.
+On Windows XP GnuGk will run as a IPv6-only gatekeeper if you enable IPv6 support.
+OpenBSD doesn't support IPv4 mapped addresses at all (latest version tested: OpenBSD 5.0),
+so it can only run GnuGk as either an IPv4 or IPv6 gatekeeper.
+
+As of December 2011, IPv6 support in endpoints is known to work with the following:
+<itemize>
+<item>Most Tandberg devices with a recent firmware support IPv6
+(eg. C series, EX90 or VCS).
+<item>Polycom HDX endpoints with firmware 3.0 or higher.
+<item>Spranto 2.6.0.14 or higher.
+</itemize>
+
+Known to not work:
+<itemize>
+<item>LifeSize endpoints do not support an IPv6 gatekeeper.
+</itemize>

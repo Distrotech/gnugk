@@ -1,0 +1,193 @@
+# -*- mode: Makefile -*-
+# Copyright (C) 2002 by its various Authors, see CVS-log
+#
+# PURPOSE OF THIS FILE: Make file for GNU Gatekeeper
+#
+# - Automatic Version Information via RCS:
+#   $Id: Makefile.in,v 1.53 2011/07/26 12:07:15 willamowius Exp $
+#   $Source: /cvsroot/openh323gk/openh323gk/Makefile.in,v $
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+#
+
+PROG	 = gnugk
+SOURCES	 = singleton.cxx job.cxx yasocket.cxx h323util.cxx \
+           Toolkit.cxx SoftPBX.cxx GkStatus.cxx RasTbl.cxx Routing.cxx \
+           Neighbor.cxx GkClient.cxx gkauth.cxx RasSrv.cxx ProxyChannel.cxx \
+           gk.cxx version.cxx gkacct.cxx gktimer.cxx gkconfig.cxx \
+           sigmsg.cxx clirw.cxx cisco.cxx ipauth.cxx statusacct.cxx \
+           syslogacct.cxx capctrl.cxx MakeCall.cxx h460presence.cxx \
+           @SOURCES@
+
+HEADERS  = GkClient.h GkStatus.h Neighbor.h ProxyChannel.h RasPDU.h \
+           RasSrv.h RasTbl.h Routing.h SoftPBX.h Toolkit.h factory.h \
+           gk.h gk_const.h gkacct.h gkauth.h job.h name.h rasinfo.h rwlock.h \
+           singleton.h slist.h stl_supp.h version.h yasocket.h gktimer.h \
+           gkconfig.h configure Makefile sigmsg.h clirw.h cisco.h ipauth.h \
+           statusacct.h syslogacct.h capctrl.h MakeCall.h h460presence.h \
+           @HEADERS@
+
+# add cleanup files for non-default targets
+CLEAN_FILES += docs/manual/*.html
+# add cleanup files for autoconf
+#CLEAN_FILES += Makefile config.*
+
+# colon, the empty variable and a single space are special characters to
+# MAKE and may cause trouble. Let's 'quote' the little bastards by
+# assigning it to a variable
+colon:=:
+comma:=,
+empty:=
+space:=$(empty) $(empty)
+
+# remove half updated or corrupt files
+.DELETE_ON_ERROR:
+
+# setup various important paths
+PTLIBDIR=@PTLIBDIR@
+OPENH323DIR=@OPENH323DIR@
+OPENH323MAKEDIR=@OPENH323MAKEDIR@
+
+ifndef TMP
+  TMP=/tmp
+endif
+
+ifeq (@NEEDOPENH323PREFIX@,1)
+ifndef PREFIX
+PREFIX=@OPENH323INSTALLPREFIX@
+endif
+endif
+
+CWD:=$(shell pwd)
+
+
+# having an own idea about default targets
+.PHONY: bothdepend optnoshared gkdefault
+.DEFAULT: gkdefault
+gkdefault: bothdepend optnoshared
+
+# LD_RUN_LIST is the list form of the LD_RUN_PATH
+LD_RUN_LIST := $(subst $(colon),$(space),$(LD_RUN_PATH))
+LD_RUN_LIST += $(PTLIBDIR)/lib $(OPENH323DIR)/lib
+
+# compiler/linker flags set by configure script
+STDCCFLAGS += @STDCCFLAGS@
+LDFLAGS    += @LDFLAGS@
+ENDLDLIBS  += @ENDLDLIBS@
+ENDLDFLAGS += @ENDLDFLAGS@
+
+STDCCFLAGS += -D'MANUFACTURER=@MANUFACTURER@'
+STDCCFLAGS += -D'PROGRAMMNAME=@PROGRAMNAME@'
+
+# automatically include debugging code or not
+ifdef PASN_NOPRINT
+  STDCCFLAGS += -DPASN_NOPRINT
+endif
+
+#STDCCFLAGS += -DRTP_DEBUG=1
+
+###
+### Including the general make rules of OpenH323
+###
+
+include $(OPENH323MAKEDIR)/openh323u.mak
+
+### Remove -fdata-sections gcc option that cause problems during link step
+temp_STDCCFLAGS := $(subst -fdata-sections,,$(STDCCFLAGS))
+STDCCFLAGS = $(temp_STDCCFLAGS)
+
+ifeq "$(OSTYPE)" "solaris"
+    ### Remove references to gcc 3.x libs that come with Solaris 10
+    temp_ENDLDLIBS := $(subst -R/usr/sfw/lib,,$(ENDLDLIBS))
+    ENDLDLIBS = $(temp_ENDLDLIBS)
+    temp_ENDLDLIBS := $(subst -L/usr/sfw/lib,,$(ENDLDLIBS))
+    ENDLDLIBS = $(temp_ENDLDLIBS)
+    ENDLDLIBS += -L/opt/csw/lib
+endif # solaris
+
+# GK version infomation
+STDCCFLAGS	+= -DMAJOR_VERSION=@GNUGK_MAJOR_VERSION@ -DMINOR_VERSION=@GNUGK_MINOR_VERSION@ -DBUILD_NUMBER=@GNUGK_BUILD_NUMBER@
+
+STDCCFLAGS += -fno-strict-aliasing
+ifeq "$(OSTYPE)" "linux"
+	# security flags
+	STDCCFLAGS += -fstack-protector
+    LDFLAGS += -Wl,-z,relro,-z,now
+endif # linux
+# can't enable PIE on openSuSE 11.4 due to linker bug
+#STDCCFLAGS += -fPIE -pie
+#LDFLAGS    += -fPIE -pie
+
+# enable more warnings when using gcc >= 4.4
+GCCMAJOREQ4 := $(shell expr 4 = `gcc -dumpversion | cut -f1 -d.`)
+GCCMAJORGT4 := $(shell expr 4 \< `gcc -dumpversion | cut -f1 -d.`)
+GCCMINORGTEQ4 := $(shell expr 4 \<= `gcc -dumpversion | cut -f2 -d.`)
+ifeq "$(GCCMAJOREQ4)" "1"
+ifeq "$(GCCMINORGTEQ4)" "1"
+STDCCFLAGS += -Wtype-limits -Wstrict-overflow=5 -fstrict-overflow -Wsign-compare
+endif
+endif
+ifeq "$(GCCMAJORGT4)" "1"
+STDCCFLAGS += -Wtype-limits -Wstrict-overflow=5 -fstrict-overflow -Wsign-compare
+endif
+
+# special dependency to ensure version.cxx is rebuilt each time gnugk is recompiled
+# so the proper build timestamp is included
+versionts.h: $(subst version.cxx,,$(SOURCES)) $(HEADERS) $(OH323_LIBDIR)/$(OH323_FILE) $(PT_LIBDIR)/$(PTLIB_FILE)
+	@touch $@
+
+doc:
+	$(MAKE) -C docs/manual html
+
+# test support using Google C++ Test Framework
+TESTCASES = h323util.t.cxx
+TESTOBJS = ./obj_linux_x86_64_s/h323util.o
+
+libgtest.a:
+	$(CXX) -I${GTEST_DIR}/include -I${GTEST_DIR} -c ${GTEST_DIR}/src/gtest-all.cc
+	$(AR) -rv libgtest.a gtest-all.o
+
+test: libgtest.a testrunner.cxx $(TESTCASES) $(TESTOBJS)
+	$(CXX) -I${GTEST_DIR}/include $(STDCCFLAGS) testrunner.cxx $(TESTCASES) -o testrunner libgtest.a $(TESTOBJS) $(LDFLAGS) -lh323_linux_x86_64__s -lpt_s $(ENDLDLIBS)
+	./testrunner
+	
+
+#
+# By this command the build number may be incremented
+#
+.PHONY: increment
+
+# Use this to increment the build number
+increment:
+	-@BN=@GNUGK_BUILD_NUMBER@; \
+        BNN=`expr "$$BN" + 1`; \
+        echo "Upgrading from build $$BN to $$BNN"; \
+        cp version.h $(TMP)/version.h; \
+        sed -e 's/BUILD_NUMBER.*'"$$BN"'/BUILD_NUMBER '"$$BNN/" \
+                $(TMP)/version.h > version.h; \
+        rm -f $(TMP)/version.h; \
+		echo "Rerunning configure utility"; \
+		./configure
+
+# special configure dependencies
+configure: configure.in
+	autoconf
+
+Makefile: Makefile.in config.status
+	./config.status
+
+config.status: configure
+	./config.status --recheck
+

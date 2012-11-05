@@ -1,0 +1,49 @@
+#include <windows.h>
+#include <commctrl.h>
+#include <richedit.h>
+#include "resource.h"
+
+
+
+
+//
+// Icon resources
+//
+LANGUAGE 0, SUBLANG_NEUTRAL
+1                  ICON           "gnugk.ico"
+
+
+
+//
+// Version Information resources
+//
+LANGUAGE 0, SUBLANG_NEUTRAL
+1 VERSIONINFO
+    FILEVERSION     3,0,0,0
+    PRODUCTVERSION  3,0,0,0
+    FILEOS          VOS_UNKNOWN
+    FILETYPE        VFT_UNKNOWN
+    FILESUBTYPE     VFT2_UNKNOWN
+    FILEFLAGSMASK   0x00000000
+    FILEFLAGS       0x00000000
+{
+    BLOCK "StringFileInfo"
+    {
+        BLOCK "040904e4"
+        {
+            VALUE "CompanyName", "GNU Gatekeeper Project"
+            VALUE "FileDescription", "GNU Gatekeeper"
+            VALUE "FileVersion", "3.0.0"
+            VALUE "InternalName", "GnuGk"
+            VALUE "LegalCopyright", "(c) 2011, GNU General Public License v2"
+            VALUE "LegalTrademarks", " "
+            VALUE "OriginalFilename", "gnugk.exe"
+            VALUE "ProductName", "GnuGk"
+            VALUE "ProductVersion", "3.0.0"
+        }
+    }
+    BLOCK "VarFileInfo"
+    {
+        VALUE "Translation", 0x0409, 0x04E4
+    }
+}
